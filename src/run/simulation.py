@@ -90,6 +90,7 @@ def run_single_simulation(
         covariates=["z"],
         treatment_col="D",
         compute_standard_se=True,
+        random_seed=random_seed,
     )
 
     # TWFE and Modified TWFE are calculated separately (not included in common function)

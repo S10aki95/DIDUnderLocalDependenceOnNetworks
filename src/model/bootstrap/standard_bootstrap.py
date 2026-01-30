@@ -117,6 +117,7 @@ def _bootstrap_iteration_static(
                 covariates=covariates,
                 treatment_col=treatment_col,
                 compute_standard_se=False,  # Don't calculate standard error within bootstrap
+                random_seed=iteration_seed,  # Pass iteration seed for reproducible Xu (MO) exposure mapping
             )
         finally:
             # Restore verbose
@@ -229,6 +230,7 @@ class StandardBootstrap(BaseBootstrap):
                 covariates=covariates,
                 treatment_col=treatment_col,
                 compute_standard_se=False,  # Don't calculate standard error within bootstrap
+                random_seed=iteration_seed,  # Pass iteration seed for reproducible Xu (MO) exposure mapping
             )
 
             return results

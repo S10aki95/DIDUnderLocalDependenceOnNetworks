@@ -343,8 +343,21 @@ def define_xu_exposure_group(
     neighbors_list: List[list],
     exposure_type: str,
     dgp_config: Config,
+    rng: Optional[np.random.Generator] = None,
 ) -> pd.Series:
-    """Define exposure group (G) for Xu estimators"""
+    """Define exposure group (G) for Xu estimators
+
+    Args:
+        df: Dataframe
+        neighbors_list: Neighbor list
+        exposure_type: Exposure type ("cs", "mo", "fm")
+        dgp_config: DGP configuration object
+        rng: Optional random number generator for reproducible random assignment (MO only).
+             If None, uses global np.random for backward compatibility.
+
+    Returns:
+        Exposure group series
+    """
     # Calculate number of treated units in neighbors for each unit
     s_i = np.array([df["D"].iloc[n].sum() for n in neighbors_list])
 
@@ -365,12 +378,18 @@ def define_xu_exposure_group(
         # Randomly assign 30% of units to different groups
         n_units = len(df)
         n_random = int(0.3 * n_units)
-        random_indices = np.random.choice(n_units, n_random, replace=False)
 
-        # Fix: Random assignment also within true level range. Use iloc for assignment.
-        g_mo.iloc[random_indices] = np.random.choice(
-            range(true_max_level + 1), n_random
-        )
+        # Use provided RNG if available, otherwise use global np.random for backward compatibility
+        if rng is not None:
+            random_indices = rng.choice(n_units, size=n_random, replace=False)
+            g_mo.iloc[random_indices] = rng.choice(
+                range(true_max_level + 1), size=n_random
+            )
+        else:
+            random_indices = np.random.choice(n_units, n_random, replace=False)
+            g_mo.iloc[random_indices] = np.random.choice(
+                range(true_max_level + 1), n_random
+            )
 
         return pd.Series(g_mo, index=df.index)
 

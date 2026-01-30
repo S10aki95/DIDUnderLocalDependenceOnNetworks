@@ -117,6 +117,7 @@ def compute_all_estimators(
     covariates: Optional[List[str]] = None,
     treatment_col: str = "D",
     compute_standard_se: bool = True,
+    random_seed: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Common function to calculate all estimators
@@ -132,6 +133,7 @@ def compute_all_estimators(
         covariates: List of covariate column names (default: ["z"])
         treatment_col: Treatment variable column name (default: "D")
         compute_standard_se: Whether to calculate standard error (default: True)
+        random_seed: Optional random seed for reproducible Xu (MO) exposure mapping
 
     Returns:
         Dictionary of estimator results
@@ -265,7 +267,14 @@ def compute_all_estimators(
         for exposure_type in ["cs", "mo", "fm"]:
             try:
                 xu_dr_result = estimate_xu_dr(
-                    df, neighbors_list, exposure_type, config, config, locations, K
+                    df,
+                    neighbors_list,
+                    exposure_type,
+                    config,
+                    config,
+                    locations,
+                    K,
+                    random_seed=random_seed,
                 )
                 results[f"xu_dr_{exposure_type}_ode"] = xu_dr_result.ode
                 if compute_standard_se:
@@ -278,7 +287,14 @@ def compute_all_estimators(
 
             try:
                 xu_ipw_result = estimate_xu_ipw(
-                    df, neighbors_list, exposure_type, config, config, locations, K
+                    df,
+                    neighbors_list,
+                    exposure_type,
+                    config,
+                    config,
+                    locations,
+                    K,
+                    random_seed=random_seed,
                 )
                 results[f"xu_ipw_{exposure_type}_ode"] = xu_ipw_result.ode
                 if compute_standard_se:

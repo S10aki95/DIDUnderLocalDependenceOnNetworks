@@ -18,6 +18,7 @@ def collect_influence_functions(
     exposure_type: str = "cs",
     covariates: List[str] = None,
     treatment_col: str = "D",
+    random_seed: Optional[int] = None,
 ) -> Dict[str, np.ndarray]:
     """Collect influence functions for each method
 
@@ -29,10 +30,15 @@ def collect_influence_functions(
         exposure_type: Exposure type for Xu method ("cs", "mo", "fm")
         covariates: List of covariate column names (default: ["z"])
         treatment_col: Treatment variable column name (default: "D")
+        random_seed: Optional random seed for reproducible Xu (MO) exposure mapping.
+                     Defaults to config.random_seed if None.
 
     Returns:
         Dictionary containing influence function arrays for each method
     """
+    # Use config.random_seed as default if random_seed not provided
+    if random_seed is None:
+        random_seed = getattr(config, "random_seed", None)
     if covariates is None:
         covariates = ["z"]
 
@@ -101,6 +107,7 @@ def collect_influence_functions(
         dgp_config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs[f"Xu IPW ({exposure_type.upper()})"] = xu_ipw_influence
 
@@ -115,6 +122,7 @@ def collect_influence_functions(
         dgp_config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs[f"Xu DR ({exposure_type.upper()})"] = xu_dr_influence
 
@@ -131,6 +139,7 @@ def collect_influence_functions(
         dgp_config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs[f"Xu DR ({exposure_type.upper()}) - No Adjustment"] = (
         xu_dr_influence_no_adj
