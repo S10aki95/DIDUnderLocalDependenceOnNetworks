@@ -157,6 +157,7 @@ def compute_all_estimators(
             config,
             covariates=covariates,
             treatment_col=treatment_col,
+            random_seed=random_seed,
         )
         results["proposed_adtt"] = np.mean(adtt_influence)
 
@@ -167,6 +168,7 @@ def compute_all_estimators(
             config,
             covariates=covariates,
             treatment_col=treatment_col,
+            random_seed=random_seed,
         )
         results["proposed_aitt"] = np.mean(aitt_influence)
 
@@ -182,6 +184,7 @@ def compute_all_estimators(
                     compute_adtt_influence_function,
                     "logistic",
                     config,
+                    random_seed=random_seed,
                 )
                 aitt_result = estimate_proposed_with_se(
                     df,
@@ -191,6 +194,7 @@ def compute_all_estimators(
                     compute_aitt_influence_function,
                     "logistic",
                     config,
+                    random_seed=random_seed,
                 )
                 results["proposed_adtt_se"] = adtt_result.standard_error
                 results["proposed_aitt_se"] = aitt_result.standard_error
@@ -215,6 +219,7 @@ def compute_all_estimators(
                     compute_dr_adtt_influence_function,
                     "logistic",
                     config,
+                    random_seed=random_seed,
                 )
                 results["proposed_dr_adtt"] = dr_adtt_result.estimate
                 if compute_standard_se:
@@ -228,6 +233,7 @@ def compute_all_estimators(
                     compute_dr_aitt_influence_function,
                     "logistic",
                     config,
+                    random_seed=random_seed,
                 )
                 results["proposed_dr_aitt"] = dr_aitt_result.estimate
                 if compute_standard_se:

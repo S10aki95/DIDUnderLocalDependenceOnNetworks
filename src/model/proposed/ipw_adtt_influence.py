@@ -6,7 +6,7 @@ Computes the influence function for the proposed IPW ADTT (Average Direct Treatm
 
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import List, Optional
 from ...settings import Config
 from ...utils import (
     prepare_data_for_estimation,
@@ -23,6 +23,7 @@ def compute_adtt_influence_function(
     config: Config,
     covariates: List[str] = ["z"],
     treatment_col: str = "D",
+    random_seed: Optional[int] = None,
 ) -> np.ndarray:
     """Calculate influence function for proposed ADTT estimation method
 
@@ -39,14 +40,24 @@ def compute_adtt_influence_function(
         config: Configuration object
         covariates: List of covariate column names
         treatment_col: Treatment variable column name
+        random_seed: Optional random seed for reproducible neighbor sampling
 
     Returns:
         Array of influence functions
     """
     D = df[treatment_col].values
     _, delta_Y = prepare_data_for_estimation(df)
+
+    # Create random number generator for neighbor sampling
+    rng = np.random.default_rng(random_seed) if random_seed is not None else None
+
     X_features_df = create_neighbor_features(
-        df, neighbors_list, config, covariates=covariates, treatment_col=treatment_col
+        df,
+        neighbors_list,
+        config,
+        covariates=covariates,
+        treatment_col=treatment_col,
+        rng=rng,
     )
 
     # Estimate ADTT propensity score e_i

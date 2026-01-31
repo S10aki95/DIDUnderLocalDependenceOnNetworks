@@ -408,6 +408,7 @@ def create_neighbor_features(
     pairs: Optional[List[tuple]] = None,
     covariates: List[str] = ["z"],
     treatment_col: str = "D",
+    rng: Optional[np.random.Generator] = None,
 ) -> pd.DataFrame:
     """Create feature matrix for proposed methods (common for ADTT, AITT)
 
@@ -419,6 +420,7 @@ def create_neighbor_features(
         pairs: list of (i, j) tuples for AITT estimation (required when for_aitt=True)
         covariates: List of covariate column names (default: ["z"])
         treatment_col: Treatment variable column name (default: "D")
+        rng: Optional random number generator for random neighbor sampling (default: None)
     """
     D = df[treatment_col].values
 
@@ -426,7 +428,7 @@ def create_neighbor_features(
     Z = df[covariates].values
     covariate_names = covariates
 
-    max_feats = config.max_neighbor_features
+    max_feats = config.max_neighbors
 
     # Check neighbors_list length
     if len(neighbors_list) != len(df):
@@ -446,7 +448,15 @@ def create_neighbor_features(
                         f"Invalid neighbor indices for unit {i}: {neighbors}. "
                         f"All indices must be in range [0, {len(df)})"
                     )
-                n_treats = D[neighbors][:max_feats]
+                # Randomly sample max_feats neighbors if rng is provided and len > max_feats
+                if rng is not None and len(neighbors) > max_feats:
+                    selected_indices = rng.choice(
+                        len(neighbors), size=max_feats, replace=False
+                    )
+                    selected_neighbors = [neighbors[idx] for idx in selected_indices]
+                    n_treats = D[selected_neighbors]
+                else:
+                    n_treats = D[neighbors][:max_feats]
                 features[i, : len(n_treats)] = n_treats
 
         # Set feature names and return as DataFrame
@@ -486,7 +496,17 @@ def create_neighbor_features(
                     f"Invalid neighbor indices for unit j={j} (excluding i={i}): "
                     f"{neighbors_of_j_minus_i}. All indices must be in range [0, {len(df)})"
                 )
-            D_neighbors = D[neighbors_of_j_minus_i][:max_feats]
+            # Randomly sample max_feats neighbors if rng is provided and len > max_feats
+            if rng is not None and len(neighbors_of_j_minus_i) > max_feats:
+                selected_indices = rng.choice(
+                    len(neighbors_of_j_minus_i), size=max_feats, replace=False
+                )
+                selected_neighbors = [
+                    neighbors_of_j_minus_i[idx] for idx in selected_indices
+                ]
+                D_neighbors = D[selected_neighbors]
+            else:
+                D_neighbors = D[neighbors_of_j_minus_i][:max_feats]
             padded_D_neighbors = np.pad(
                 D_neighbors, (0, max_feats - len(D_neighbors)), mode="constant"
             )

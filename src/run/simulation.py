@@ -5,6 +5,7 @@ Executes simulations based on requirements in README Chapter 3 and evaluates and
 """
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Any
@@ -186,13 +187,23 @@ def run_simulation_experiment(
     start_time = datetime.now()
 
     # Execute simulations in normal loop (with progress bar)
+    # Check if stderr is a TTY to determine if we can use dynamic progress bar
+    use_tqdm = sys.stderr.isatty()
     pbar = tqdm(
         range(config.n_simulations),
         desc="Running simulations",
         unit="iter",
         ncols=80,
         colour="green",
+        file=sys.stderr,
+        ascii=True,
+        dynamic_ncols=False,
+        disable=not use_tqdm,
     )
+
+    # For non-TTY environments, track progress for periodic updates
+    last_progress_percent = -1
+
     for i in pbar:
         # Execute simulation (data generation + estimator calculation)
         result, df, neighbors_list = run_single_simulation(
@@ -206,6 +217,16 @@ def run_simulation_experiment(
         simulation_results.append(result)
         df_list.append(df)
         neighbors_list_list.append(neighbors_list)
+
+        # For non-TTY environments, print progress every 10%
+        if not use_tqdm:
+            current_percent = int((i + 1) * 100 / config.n_simulations)
+            if current_percent >= last_progress_percent + 10:
+                print(
+                    f"Running simulations: {current_percent}% ({i + 1}/{config.n_simulations})",
+                    file=sys.stderr,
+                )
+                last_progress_percent = current_percent
 
     end_time = datetime.now()
     duration = end_time - start_time

@@ -775,17 +775,26 @@ class SEZEstimator:
         return results
 
     def _generate_county_neighbors(
-        self, df: pd.DataFrame, county_id_col: str = "cty"
+        self,
+        df: pd.DataFrame,
+        county_id_col: str = "cty",
+        max_neighbors: Optional[int] = None,
+        random_seed: Optional[int] = None,
     ) -> List[List[int]]:
         """Generate neighbor list at county level (internal method)
 
         Based on "county-level neighborhood definition" described in Section 5.9 of the paper,
         defines other villages in the same county as neighbors.
+        When the number of neighbors exceeds max_neighbors, randomly samples max_neighbors
+        to avoid arbitrary selection based on data ordering.
+
         Uses `groupby().groups` for efficiency.
 
         Args:
             df: Dataframe (index should be sequential from 0)
             county_id_col: Column name indicating county ID (default: "cty")
+            max_neighbors: Maximum number of neighbors to use per unit (default: None, uses config.max_neighbors)
+            random_seed: Optional random seed for reproducible neighbor sampling
 
         Returns:
             List[List[int]]: List of neighbor indices for each unit
@@ -793,6 +802,13 @@ class SEZEstimator:
         """
         if county_id_col not in df.columns:
             raise ValueError(f"County ID column '{county_id_col}' not found.")
+
+        # Use config.max_neighbors if max_neighbors is not provided
+        if max_neighbors is None:
+            max_neighbors = self.config.max_neighbors
+
+        # Create random number generator for neighbor sampling
+        rng = np.random.default_rng(random_seed) if random_seed is not None else None
 
         # Create dictionary of indices by county ID for efficiency
         # df.groupby().groups maps group name (county ID) to list of indices
@@ -811,6 +827,19 @@ class SEZEstimator:
 
             # Exclude self (i)
             neighbor_indices = [idx for idx in indices_in_county if idx != i]
+
+            # Randomly sample max_neighbors if len > max_neighbors
+            if len(neighbor_indices) > max_neighbors:
+                if rng is not None:
+                    # Randomly sample max_neighbors indices
+                    selected_indices = rng.choice(
+                        len(neighbor_indices), size=max_neighbors, replace=False
+                    )
+                    neighbor_indices = [neighbor_indices[j] for j in selected_indices]
+                else:
+                    # Fallback to first max_neighbors if no rng (backward compatibility)
+                    neighbor_indices = neighbor_indices[:max_neighbors]
+
             neighbors_list.append(neighbor_indices)
 
         return neighbors_list
@@ -939,7 +968,10 @@ class SEZEstimator:
         if progress_bar:
             progress_bar.set_description("Proposed methods: Creating neighbor list")
         neighbors_list = self._generate_county_neighbors(
-            df_clean, county_id_col=county_id_col
+            df_clean,
+            county_id_col=county_id_col,
+            max_neighbors=self.config.max_neighbors,
+            random_seed=self.config.random_seed,
         )
         if progress_bar:
             progress_bar.update(1)
