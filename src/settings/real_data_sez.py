@@ -72,15 +72,18 @@ class SEZDataLoader:
 
         return df
 
-    def create_panel_data(self, outcome_var: str = "y") -> pd.DataFrame:
+    def create_panel_data(
+        self, outcome_var: str = "y", return_missing_info: bool = False
+    ) -> pd.DataFrame:
         """
         Create panel data (cross-section of 2004 and 2008)
 
         Args:
             outcome_var: Outcome variable name. One of 'k' (capital), 'l' (employment), 'y' (output)
+            return_missing_info: If True, returns tuple (dataframe, missing_info_dict)
 
         Returns:
-            Panel dataframe
+            Panel dataframe, or tuple (dataframe, missing_info_dict) if return_missing_info=True
         """
         if outcome_var not in ["k", "l", "y"]:
             raise ValueError(
@@ -98,10 +101,15 @@ class SEZDataLoader:
             self.data["village_census"]["year"] == 2008
         ].copy()
 
+        # Record sample sizes at each step
+        n_villages_2004 = df_2004["village"].nunique()
+        n_villages_2008 = df_2008["village"].nunique()
+
         # Merge by village ID to create panel data
         df_panel = pd.merge(
             df_2004, df_2008, on="village", suffixes=("_2004", "_2008"), how="inner"
         )
+        n_villages_both = len(df_panel)
 
         # Select and rename necessary variables
         df_analysis = pd.DataFrame(
@@ -117,11 +125,27 @@ class SEZDataLoader:
                 "num_p": df_panel["num_2004"],  # Number of enterprises (2004)
             }
         )
+        n_after_merge = len(df_analysis)
+
+        # Check complete data (before dropna)
+        n_complete = df_analysis.notna().all(axis=1).sum()
 
         # Remove missing values
         df_analysis = df_analysis.dropna()
+        n_after_dropna = len(df_analysis)
 
-        return df_analysis
+        if return_missing_info:
+            missing_info = {
+                "n_villages_2004": n_villages_2004,
+                "n_villages_2008": n_villages_2008,
+                "n_villages_both": n_villages_both,
+                "n_after_merge": n_after_merge,
+                "n_complete": n_complete,
+                "n_after_dropna": n_after_dropna,
+            }
+            return df_analysis, missing_info
+        else:
+            return df_analysis
 
     def create_exposure_mapping(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create exposure mapping (G) (optimized version)"""

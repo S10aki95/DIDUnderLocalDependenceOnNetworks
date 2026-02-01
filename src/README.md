@@ -113,7 +113,7 @@ This document describes the detailed implementation of simulation experiments an
   - AITT propensity score: $e^\prime_{ij} = \mathrm{Pr}(D_i=1 \mid Z_i, Z_j, D_j, \mathbf{D}_{N_A(j;K)}^{-i})$
   - Marginal treatment probability: $\pi_i = \mathrm{Pr}(D_i=1 \mid Z_i)$
   - Real data uses county-level neighborhood definition
-  - For computational efficiency, when the number of neighbors exceeds `max_neighbors_per_unit` (default: 20), neighbors are selected via random sampling
+  - For computational efficiency, when the number of neighbors exceeds `max_neighbors` (default: 10 for real data, 20 for simulation), neighbors are selected via random sampling
 - **Standard Errors**: Since spatial coordinate information is not available in real data, HAC standard errors are not used; calculated from standard deviation of influence function
   - Formula: $SE = \frac{\mathrm{std}(Z_i)}{\sqrt{N}}$ (where $Z_i$ is the influence function)
   - For ADTT: $Z_i = \frac{D_i - e_i}{\widehat{\pi}_i(1 - e_i)} (Y_{2i} - Y_{1i})$
@@ -151,6 +151,7 @@ uv run python main.py --mode real_data --data_dir data --output_dir results
 - `results/sez_analysis_results.csv`: Analysis results (estimates and standard errors)
   - Contains results for each of the 3 outcome variables (capital, employment, output)
   - Records estimates and standard errors such as DATT_0, DATT_1, ODE, Spillover_Effect for each outcome variable
+  - **Proposed Methods**: Includes `ADTT`, `ADTT_se`, `AITT`, `AITT_se` (Average Direct/Indirect Treatment Effect on the Treated and their standard errors)
 - `results/sez_analysis_report.md`: Detailed results report
   - Displays data summary and estimation results sectioned by each of the 3 outcome variables (capital, employment, output)
   - Explicitly states variable names used for each outcome variable
@@ -268,9 +269,9 @@ Here, $\hat{e}^\prime_{ij}$ and $\widehat{\pi}_i$ are the following estimators.
 
 2. **Feature Engineering**
    - When the dimension of explanatory variables differs by neighborhood size for each propensity score prediction, sort by distance from a specific unit,
-   - If neighborhood size (number of units with $l_A < K$ from a specific unit) is `max_neighbor_features` (default: 10) or more: use top `max_neighbor_features` units
-   - If neighborhood size is less than `max_neighbor_features`: perform zero padding
-   - `max_neighbor_features` is configurable in `settings/config.py` (default: 10)
+   - If neighborhood size (number of units with $l_A < K$ from a specific unit) is `max_neighbors` (default: 10) or more: randomly sample `max_neighbors` units
+   - If neighborhood size is less than `max_neighbors`: use all neighbors (with zero padding if needed)
+   - `max_neighbors` is configurable in `settings/config.py` (default: 10)
 
 3. **Model Training and Prediction (using logistic regression)**
    - ADTT (estimation of $e_i$):
@@ -288,8 +289,8 @@ Here, $\hat{e}^\prime_{ij}$ and $\widehat{\pi}_i$ are the following estimators.
 
 5. **Computational Efficiency in Real Data Analysis**
    - **Neighbor Sampling**: In real data, when the number of villages in a county is large (maximum 753 villages), the number of pairs becomes very large for AITT estimation (approximately 11.3 million pairs), so neighbor sampling is implemented for computational efficiency.
-     - For each unit $i$, when the number of neighbors exceeds `max_neighbors_per_unit`, select at most `max_neighbors_per_unit` neighbors via random sampling.
-     - Default setting: `max_neighbors_per_unit=20` (configurable in `settings/config.py`)
+     - For each unit $i$, when the number of neighbors exceeds `max_neighbors`, select at most `max_neighbors` neighbors via random sampling.
+     - Default setting: `max_neighbors=20` for simulation, `max_neighbors=10` for real data (configurable in `settings/config.py`)
      - Random seed: `random_seed=42` (configurable in `settings/config.py` for reproducibility)
      - This reduces total number of pairs from approximately 11.3 million to approximately 1.2 million, significantly shortening computation time.
 
@@ -390,6 +391,47 @@ where:
 
 ※ Implementation based on `drdid_panel` function from R package "DRDID" (Sant'Anna & Zhao, 2020)
 
+## 2.4. Execution Methods
+
+### 2.4.1. Basic Simulation Execution
+
+```bash
+# Run simulation experiment (default settings)
+uv run python main.py --mode simulation
+
+# Specify output directory
+uv run python main.py --mode simulation --output_dir results
+```
+
+This command executes:
+1. **Basic simulation** with default settings (n=500, K=1.0, M=100 iterations)
+2. **Robustness experiments** with multiple configurations:
+   - Sample size variations (n=300, 500, 700)
+   - Network density variations (K=0.8, 1.0, 1.2)
+   - Spatial correlation variations (ρ=0.2, 0.5, 0.8)
+   - Neighbor feature count variations (max_neighbors=5, 10, 15)
+3. **Output generation**:
+   - `simulation_results.csv`, `evaluation_results.csv` (basic simulation)
+   - `robustness_results.csv` (integrated results from all robustness experiments)
+   - `plot_data_*.csv` files for figure generation
+   - Python-generated figures (`*.png`) and R-ready data files
+
+### 2.4.2. Generating Robustness Figures
+
+After running the simulation, generate high-quality figures using R:
+
+```bash
+# Generate all figures (including robustness analysis)
+Rscript src/visualize_r.R --type all
+
+# Generate specific robustness figures
+Rscript src/visualize_r.R --type robustness_bias_sample_size
+Rscript src/visualize_r.R --type robustness_bias_correlation
+Rscript src/visualize_r.R --type sensitivity_bias_features
+```
+
+**Note**: The R script reads `robustness_results.csv` (generated by the simulation mode) to create robustness analysis figures. Ensure the simulation has completed before running the R script.
+
 ---
 
 # 3. Detailed Description of Result Files
@@ -401,20 +443,40 @@ This section provides detailed explanations of the purpose and content of each f
 | File Name                                       | Purpose                                                                           | Main Content                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ----------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `simulation_results.csv`                        | Records estimates and standard errors of all estimators for each simulation trial | For each trial (row), includes estimates and standard errors of proposed methods (ADTT, AITT), standard methods (Canonical IPW, Canonical TWFE, DR-DID, Modified TWFE), and Xu (2025) methods (DR/IPW estimators for CS, MO, FM scenarios). Also includes true parameter values (`true_adtt`, `true_aitt`) and number of units (`n_units`). Used as raw data to evaluate distribution and bias of each estimator. |
-| `simulation_results_neighbor_features_15.csv`   | Records simulation results when neighbor feature count is set to 15               | Same structure as `simulation_results.csv` but contains only results with `max_neighbor_features=15` setting. Used as part of sensitivity analysis to evaluate impact of hyperparameter (neighbor feature count) selection on estimator performance.                                                                                                                                                              |
+| `simulation_results_neighbor_features_15.csv`   | Records simulation results when neighbor feature count is set to 15               | Same structure as `simulation_results.csv` but contains only results with `max_neighbors=15` setting. Used as part of sensitivity analysis to evaluate impact of hyperparameter (neighbor feature count) selection on estimator performance.                                                                                                                                                                      |
 | `evaluation_results.csv`                        | Summarizes quantitative evaluation results of each estimator's performance        | For each estimator, includes results of the following evaluation metrics: **Bias** (difference between estimator's mean value and true value), **RMSE** (root mean squared error), **N_Valid** (number of valid estimates), **Coverage_Rate** (95% confidence interval coverage rate, only for proposed and standard methods). Provides main metrics for comparing estimator performance.                         |
-| `evaluation_results_neighbor_features_15.csv`   | Records evaluation results when neighbor feature count is set to 15               | Same structure as `evaluation_results.csv` but contains only evaluation results with `max_neighbor_features=15` setting. Used as sensitivity analysis results.                                                                                                                                                                                                                                                    |
+| `evaluation_results_neighbor_features_15.csv`   | Records evaluation results when neighbor feature count is set to 15               | Same structure as `evaluation_results.csv` but contains only evaluation results with `max_neighbors=15` setting. Used as sensitivity analysis results.                                                                                                                                                                                                                                                            |
 | `robustness_results.csv`                        | Records integrated results of robustness experiments                              | For each experiment type (`experiment_type`: sample, network, spatial, neighbor) and experiment ID (`experiment_id`), records Bias, RMSE, Coverage_Rate for each estimator. Also includes experiment settings (`config_name`, `overrides`), making it possible to track which settings were used. Used as comprehensive dataset to evaluate robustness of estimators.                                             |
 | `coverage_rate.csv`                             | Summarizes 95% confidence interval coverage rates for each estimator concisely    | Consists of 2 columns: estimator name (`Estimator`) and coverage rate (`Coverage Rate (95% CI)`). Includes coverage rates for proposed methods (ADTT, AITT) and standard methods (Canonical IPW, Canonical TWFE, DR-DID, Modified TWFE). Xu (2025) methods are not subject to interval estimation, so displayed as N/A. Used to quickly verify validity of interval estimation for estimators.                    |
 | `se_comparison_table{experiment_id_suffix}.csv` | Compares bootstrap standard errors with regular standard errors                   | Generated when `--use_bootstrap` flag is enabled. Table comparing regular standard errors (influence function-based or HAC) with bootstrap standard errors for each estimator. Used to check differences due to standard error estimation methods.                                                                                                                                                                |
 
+### Estimator Name Mapping (Paper Tables vs CSV Files)
+
+When comparing results in the paper's tables (e.g., Table 5, Table 6) with `evaluation_results.csv`, note that the estimator names differ:
+
+| Paper Table Label   | CSV Column (`Estimator` in `evaluation_results.csv`) | Notes                      |
+| ------------------- | ---------------------------------------------------- | -------------------------- |
+| Proposed IPW (ADTT) | `Proposed IPW ADTT (Logistic)`                       |                            |
+| Proposed DR (ADTT)  | `Proposed DR ADTT (Logistic)`                        |                            |
+| Proposed IPW (AITT) | `Proposed IPW AITT (Logistic)`                       |                            |
+| Proposed DR (AITT)  | `Proposed DR AITT (Logistic)`                        |                            |
+| Xu (Oracle)         | `Xu DR (CS) - ODE`                                   | CS = Correctly Specified   |
+| Xu (MO)             | `Xu DR (MO) - ODE`                                   | MO = Misspecified Ordering |
+| Xu (FM)             | `Xu DR (FM) - ODE`                                   | FM = Fully Misspecified    |
+| Canonical IPW       | `Canonical IPW`                                      |                            |
+| Canonical TWFE      | `Canonical TWFE`                                     |                            |
+| DR-DID              | `DR-DID`                                             |                            |
+| Modified TWFE       | `Modified TWFE`                                      |                            |
+
+This mapping is managed in `src/visualization/config.py` (`ACTUAL_ESTIMATOR_NAMES`) and `src/run/common.py` (`ESTIMATOR_COLUMNS`).
+
 ## 3.2. Real Data Analysis Result Files
 
-| File Name                   | Purpose                                                                                                         | Main Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sez_analysis_results.csv`  | Records estimation results for each outcome variable (capital, employment, output) in China SEZ policy analysis | For each outcome variable (`outcome_var`, `outcome_name`), includes the following estimates and standard errors: **DATT_DR_0, DATT_DR_1** (direct effects at each exposure level from Xu (2025)'s DR estimator), **DATT_IPW_0, DATT_IPW_1** (direct effects at each exposure level from IPW estimator), **ODE_DR, ODE_IPW** (overall direct effects), **Spillover_Treated_DR, Spillover_Control_DR** (spillover effects in treatment/control groups, DR estimator), **Spillover_Treated_IPW, Spillover_Control_IPW** (spillover effects in treatment/control groups, IPW estimator), **Canonical_IPW, Canonical_DR_DID** (standard DID estimators). Provides main results of real data analysis in table format. |
-| `sez_analysis_report.md`    | Reports detailed results of real data analysis in readable format                                               | Displays experiment purpose and setting descriptions, data summary (sample size, variable descriptions, etc.), and analysis results sectioned by each outcome variable (capital, employment, output). Organizes results in format corresponding to Table 4 of Xu (2025) paper. Detailed tables including estimates, standard errors, and statistical significance. Used as reference material when using real data analysis results in papers or presentations.                                                                                                                                                                                                                                                  |
-| `missing_data_analysis.csv` | Records missing data situation in real data analysis                                                            | For each outcome variable (`outcome_var`, `outcome_name`), includes the following information: `n_villages_2004` (number of villages in 2004), `n_villages_2008` (number of villages in 2008), `n_villages_both` (number of villages with data at both time points), `n_after_merge` (number of villages after merge), `n_complete` (number of villages with complete data), `n_after_dropna` (number of villages after removing missing values), `xu_paper_n` (sample size reported in Xu (2025) paper), `difference` (difference in sample size from paper). Used for data quality management and comparison with paper.                                                                                       |
+| File Name                   | Purpose                                                                                                         | Main Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sez_analysis_results.csv`  | Records estimation results for each outcome variable (capital, employment, output) in China SEZ policy analysis | For each outcome variable (`outcome_var`, `outcome_name`), includes the following estimates and standard errors: **DATT_DR_0, DATT_DR_1** (direct effects at each exposure level from Xu (2025)'s DR estimator), **DATT_IPW_0, DATT_IPW_1** (direct effects at each exposure level from IPW estimator), **ODE_DR, ODE_IPW** (overall direct effects), **Spillover_Treated_DR, Spillover_Control_DR** (spillover effects in treatment/control groups, DR estimator), **Spillover_Treated_IPW, Spillover_Control_IPW** (spillover effects in treatment/control groups, IPW estimator), **ADTT, ADTT_se, AITT, AITT_se** (Proposed IPW methods: Average Direct/Indirect Treatment Effect on the Treated and their standard errors), **Canonical_IPW, Canonical_DR_DID** (standard DID estimators). Provides main results of real data analysis in table format. **Note**: In the paper's Table 7, "Canonical DID" refers to one of these two estimators (either `Canonical_IPW` or `Canonical_DR_DID`); both are included in the CSV for reference. |
+| `sez_analysis_report.md`    | Reports detailed results of real data analysis in readable format                                               | Displays experiment purpose and setting descriptions, data summary (sample size, variable descriptions, etc.), and analysis results sectioned by each outcome variable (capital, employment, output). Organizes results in format corresponding to Table 4 of Xu (2025) paper. Detailed tables including estimates, standard errors, and statistical significance. Used as reference material when using real data analysis results in papers or presentations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `missing_data_analysis.csv` | Records missing data situation in real data analysis                                                            | For each outcome variable (`outcome_var`, `outcome_name`), includes the following information: `n_villages_2004` (number of villages in 2004), `n_villages_2008` (number of villages in 2008), `n_villages_both` (number of villages with data at both time points), `n_after_merge` (number of villages after merge), `n_complete` (number of villages with complete data), `n_after_dropna` (number of villages after removing missing values), `xu_paper_n` (sample size reported in Xu (2025) paper), `difference` (difference in sample size from paper). Used for data quality management and comparison with paper.                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## 3.3. Visualization Files (PNG)
 
@@ -439,11 +501,11 @@ This section provides detailed explanations of the purpose and content of each f
 
 ### Sensitivity Analysis Charts
 
-| File Name                                             | Purpose                                                                                       | Main Content                                                                                                                                                                                                                                                                             |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sensitivity_bias_vs_features.png`                    | Visualizes changes in bias of proposed methods with respect to neighbor feature count changes | Plots neighbor feature count (max_neighbor_features=5, 10, 15) on x-axis, bias on y-axis. Displays bias of proposed methods (ADTT, AITT) as line graph, confirming impact of hyperparameter selection on estimator performance. Used to evaluate robustness of hyperparameter selection. |
-| `sensitivity_rmse_vs_features.png`                    | Visualizes changes in RMSE of proposed methods with respect to neighbor feature count changes | Plots neighbor feature count on x-axis, RMSE on y-axis. Displays RMSE of proposed methods (ADTT, AITT) as line graph, confirming impact of hyperparameter selection on estimator efficiency. Used to evaluate robustness of hyperparameter selection.                                    |
-| `bootstrap_se_distribution{experiment_id_suffix}.png` | Visualizes distribution of bootstrap standard errors                                          | Generated when `--use_bootstrap` flag is enabled. Displays distribution of bootstrap standard errors for each estimator as box plots. By comparing with regular standard errors, can visually confirm differences due to standard error estimation methods.                              |
+| File Name                                             | Purpose                                                                                       | Main Content                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sensitivity_bias_vs_features.png`                    | Visualizes changes in bias of proposed methods with respect to neighbor feature count changes | Plots neighbor feature count (max_neighbors=5, 10, 15) on x-axis, bias on y-axis. Displays bias of proposed methods (ADTT, AITT) as line graph, confirming impact of hyperparameter selection on estimator performance. Used to evaluate robustness of hyperparameter selection. |
+| `sensitivity_rmse_vs_features.png`                    | Visualizes changes in RMSE of proposed methods with respect to neighbor feature count changes | Plots neighbor feature count on x-axis, RMSE on y-axis. Displays RMSE of proposed methods (ADTT, AITT) as line graph, confirming impact of hyperparameter selection on estimator efficiency. Used to evaluate robustness of hyperparameter selection.                            |
+| `bootstrap_se_distribution{experiment_id_suffix}.png` | Visualizes distribution of bootstrap standard errors                                          | Generated when `--use_bootstrap` flag is enabled. Displays distribution of bootstrap standard errors for each estimator as box plots. By comparing with regular standard errors, can visually confirm differences due to standard error estimation methods.                      |
 
 ## 3.4. Report Files (Markdown)
 

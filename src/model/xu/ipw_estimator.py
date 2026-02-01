@@ -13,7 +13,7 @@ from ..common.models import XuEstimateResult
 from .propensity_scores import estimate_xu_propensity_scores
 from .ipw_weights import compute_xu_ipw_weights
 from .ipw_influence import compute_xu_ipw_influence_function
-from typing import List
+from typing import List, Optional
 
 
 def compute_xu_ipw_influence_function_ode(
@@ -24,6 +24,7 @@ def compute_xu_ipw_influence_function_ode(
     dgp_config: Config,
     covariates: List[str] = ["z"],
     treatment_col: str = "D",
+    random_seed: Optional[int] = None,
 ) -> np.ndarray:
     """Calculate ODE influence function for Xu IPW estimator (similar interface to proposed methods)
 
@@ -35,6 +36,7 @@ def compute_xu_ipw_influence_function_ode(
         dgp_config: DGP configuration object
         covariates: List of covariate column names (default: ["z"])
         treatment_col: Treatment variable column name (default: "D")
+        random_seed: Optional random seed for reproducible Xu (MO) exposure mapping
 
     Returns:
         Array of influence functions for ODE
@@ -43,8 +45,13 @@ def compute_xu_ipw_influence_function_ode(
     X, D = df_est[covariates], df_est[treatment_col]
     n = len(df_est)
 
+    # Create RNG from seed if provided (for reproducible MO exposure mapping)
+    rng = np.random.default_rng(random_seed) if random_seed is not None else None
+
     # 1. Define Exposure Mapping
-    G = define_xu_exposure_group(df_est, neighbors_list, exposure_type, dgp_config)
+    G = define_xu_exposure_group(
+        df_est, neighbors_list, exposure_type, dgp_config, rng=rng
+    )
 
     # 2. Estimate propensity score models
     ps_results = estimate_xu_propensity_scores(X, D, G, config)
@@ -115,6 +122,7 @@ def estimate_xu_ipw(
     dgp_config: Config,
     locations: np.ndarray,
     K: float,
+    random_seed: Optional[int] = None,
 ) -> XuEstimateResult:
     """Calculate Xu (2025) IPW estimator (for DATT)
 
@@ -132,6 +140,7 @@ def estimate_xu_ipw(
         dgp_config: DGP configuration object
         locations: Spatial location array
         K: Bandwidth parameter
+        random_seed: Optional random seed for reproducible Xu (MO) exposure mapping
 
     Returns:
         DATT(g) estimates, ODE, standard errors
@@ -144,8 +153,13 @@ def estimate_xu_ipw(
     X, D = df_est[["z"]], df_est["D"]
     n = len(df_est)
 
+    # Create RNG from seed if provided (for reproducible MO exposure mapping)
+    rng = np.random.default_rng(random_seed) if random_seed is not None else None
+
     # 1. Define Exposure Mapping
-    G = define_xu_exposure_group(df_est, neighbors_list, exposure_type, dgp_config)
+    G = define_xu_exposure_group(
+        df_est, neighbors_list, exposure_type, dgp_config, rng=rng
+    )
 
     # 2. Estimate propensity score models
     ps_results = estimate_xu_propensity_scores(X, D, G, config)

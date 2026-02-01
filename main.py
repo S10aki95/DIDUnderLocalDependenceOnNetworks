@@ -452,6 +452,7 @@ def run_sez_analysis_internal(
     outcome_vars = {"k": "Capital (log)", "l": "Employment (log)", "y": "Output (log)"}
 
     all_results = {}  # Store results for all outcome variables
+    all_missing_info = []  # Store missing data information for all outcome variables
 
     for outcome_var, outcome_name in outcome_vars.items():
         print("\n" + "=" * 80)
@@ -460,7 +461,11 @@ def run_sez_analysis_internal(
 
         # 2. Prepare analysis data
         print("\n[Step 2] Preparing analysis data...")
-        df_analysis = loader.create_panel_data(outcome_var=outcome_var)
+        df_analysis, missing_info = loader.create_panel_data(
+            outcome_var=outcome_var, return_missing_info=True
+        )
+        missing_info["outcome_var"] = outcome_var
+        missing_info["outcome_name"] = outcome_name
 
         # Create exposure mapping
         df_with_exposure = loader.create_exposure_mapping(df_analysis)
@@ -528,6 +533,9 @@ def run_sez_analysis_internal(
             "n_treated": df_final["W"].sum(),
             "n_exposed": df_final["G"].sum(),
         }
+
+        # Store missing data information
+        all_missing_info.append(missing_info)
 
     # 6. Save results
     print("\n" + "=" * 80)
@@ -619,6 +627,46 @@ def run_sez_analysis_internal(
         f.write(f"- Bootstrap iterations: {n_bootstrap}\n")
 
     print(f"✓ Saved detailed report: {markdown_path}")
+
+    # Save missing data analysis
+    missing_data_df = pd.DataFrame(all_missing_info)
+    # Add Xu (2025) paper sample sizes (these need to be manually set based on the paper)
+    # Note: These values should be updated based on actual paper values
+    xu_paper_n_values = {
+        "k": None,  # Set actual value from paper if available
+        "l": None,  # Set actual value from paper if available
+        "y": None,  # Set actual value from paper if available
+    }
+    missing_data_df["xu_paper_n"] = missing_data_df["outcome_var"].map(
+        xu_paper_n_values
+    )
+    missing_data_df["difference"] = missing_data_df.apply(
+        lambda row: (
+            row["n_after_dropna"] - row["xu_paper_n"]
+            if row["xu_paper_n"] is not None
+            else None
+        ),
+        axis=1,
+    )
+
+    # Reorder columns
+    column_order = [
+        "outcome_var",
+        "outcome_name",
+        "n_villages_2004",
+        "n_villages_2008",
+        "n_villages_both",
+        "n_after_merge",
+        "n_complete",
+        "n_after_dropna",
+        "xu_paper_n",
+        "difference",
+    ]
+    missing_data_df = missing_data_df[column_order]
+
+    missing_data_csv_path = os.path.join(output_dir, "missing_data_analysis.csv")
+    missing_data_df.to_csv(missing_data_csv_path, index=False)
+    print(f"✓ Saved missing data analysis: {missing_data_csv_path}")
 
     # Return dataframe of last processed outcome variable (for backward compatibility)
     df_final = loader.create_panel_data(outcome_var="y")

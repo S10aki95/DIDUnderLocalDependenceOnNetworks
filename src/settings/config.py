@@ -48,9 +48,8 @@ class Config:
         500  # Maximum iterations for logistic regression (optimized to 500 for real data analysis speedup)
     )
     ols_min_samples: int = 24
-    max_neighbor_features: int = 10
-    # Neighbor sampling limit for AITT estimation (optimized to 10 for real data analysis speedup)
-    max_neighbors_per_unit: int = 10
+    # Maximum number of neighbors to use (unified parameter for both feature creation and AITT pair selection)
+    max_neighbors: int = 10
     epsilon: float = 1e-9
     confidence_level: float = 0.95
     verbose: bool = True  # Whether to output logs
@@ -127,7 +126,7 @@ ROBUSTNESS_SCENARIOS = {
         "display_name": "Spatial Correlation",
     },
     "neighbor_features": {
-        "parameter": "max_neighbor_features",
+        "parameter": "max_neighbors",
         "values": [5, 10, 15],
         "description": "Robustness to neighbor feature count variation",
         "display_name": "Neighbor Features",
@@ -155,7 +154,7 @@ def get_config(
     if config_name == "simulation":
         # For simulation experiments: higher precision settings (original values)
         config = Config(
-            max_neighbors_per_unit=20,  # Use more neighbors in simulation
+            max_neighbors=20,  # Use more neighbors in simulation
             logistic_max_iter=1000,  # Use more iterations in simulation
         )
     else:

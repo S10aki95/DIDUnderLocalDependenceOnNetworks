@@ -268,8 +268,9 @@ class BaseBootstrap:
             n_jobs = max(1, multiprocessing.cpu_count() // 2)
 
         # Update description if progress bar specified (don't display message)
+        # Only update if progress bar is not disabled
         original_desc = None
-        if progress_bar:
+        if progress_bar and not getattr(progress_bar, "disable", False):
             original_desc = progress_bar.desc
             # Update progress bar description
             progress_bar.set_description(f"{original_desc} - Running bootstrap")
@@ -282,8 +283,12 @@ class BaseBootstrap:
             delayed(iteration_func)(*args) for args in iteration_args
         )
 
-        # Restore description if progress bar specified
-        if progress_bar and original_desc:
+        # Restore description if progress bar specified and not disabled
+        if (
+            progress_bar
+            and original_desc
+            and not getattr(progress_bar, "disable", False)
+        ):
             progress_bar.set_description(original_desc)
 
         # Exclude None (errors)

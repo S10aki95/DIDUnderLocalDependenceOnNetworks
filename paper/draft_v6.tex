@@ -1,0 +1,1144 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[truedimen,margin=30mm]{geometry} 
+
+%
+\usepackage{mathrsfs}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{ascmac}
+\usepackage{amsthm}
+\usepackage[dvips]{graphicx}
+\graphicspath{{../results/}}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{times}
+\usepackage{comment}
+
+\usepackage{color}
+
+
+%
+\usepackage{titlesec}
+\titleformat*{\section}{\large\bfseries}
+\titleformat*{\subsection}{\it}
+
+
+%
+\newtheorem{df}{Definition}
+\newtheorem{thm}{Theorem}
+\newtheorem{lem}{Lemma}
+\newtheorem{cor}{Corollary}
+\newtheorem{prp}{Proposition}
+\newtheorem{exm}{Example}
+\newtheorem{algo}{Algorithm}
+\newtheorem{as}{Assumption}
+%
+
+%----------------------------------------%
+%           Definition                   %
+%----------------------------------------%
+
+\def\ep{{\varepsilon}}
+\def\Si{{\Sigma}}
+\def\Ga{\Gamma}
+
+\def\tht{{\widetilde{\theta}}}
+\def\thh{{\widehat{\theta}}}
+\def\bD{{\boldsymbol{D}}}
+\def\bd{{\boldsymbol{d}}}
+
+
+%----------------------------------------%
+%          Title page                    %
+%----------------------------------------%
+% IV.1. タイトルの再検討 -> "Difference-in-Differences under Local Dependence on Networks" に変更
+\title{{\bf Difference-in-Differences under Local Dependence on Networks}\footnote{\today}}
+
+\date{}
+
+
+\begin{document}
+
+\maketitle
+\doublespacing
+
+\vspace{-1.5cm}
+\begin{center}
+% I.3. 表記の統一 (School)
+{\large Akihiro Sato$^1$ and Shonosuke Sugasawa$^2$}
+
+\medskip
+%\today
+
+\medskip
+\noindent
+% I.3. 表記の統一 (School)
+$^1$Graduate School of Economics, Keio University\\
+$^2$Faculty of Economics, Keio University\\
+\end{center}
+
+
+
+\vspace{0.3cm}
+\begin{center}
+{\bf \large Abstract}
+\end{center}
+
+\vspace{-0cm}
+% I.3. 表記の統一 (Difference-in-Differences)
+Estimating causal effects under interference, where the stable unit treatment value assumption (SUTVA) is violated, is critical in fields like marketing and policy evaluation. A common limitation of existing Difference-in-Differences (DID) methods is the reliance on a pre-specified ``exposure mapping.'' This paper proposes a nonparametric identification strategy for direct and indirect average treatment effects under local interference on an observed network, combined with flexible estimation methods (inverse probability weighting and doubly robust estimation) that are practicable in finite samples. We exploit the panel data structure to identify effects based on a parallel trends assumption conditional on the neighborhood treatment vector. We provide inverse probability weighted (IPW) and doubly robust (DR) estimators, establishing their asymptotic properties and consistency under misspecification of nuisance models. Simulation studies and an empirical application demonstrate the method's effectiveness. 
+
+\bigskip\noindent
+% I.3. 表記の統一
+{\bf Key words}: Exposure Mapping, Unknown Interaction, Spillover, DID, Causal Inference, Network Effect
+
+
+
+\newpage
+%----------------------------------------%
+%   Introduction %
+%----------------------------------------%
+\section{Introduction}
+
+% I.3. 表記の統一 (Difference-in-Differences)
+Estimating the causal effect of an intervention remains a central challenge in empirical research. While the Difference-in-Differences (DID) framework has long served as a cornerstone for this purpose, its foundational assumptions have recently come under intense scrutiny. A substantial body of literature has demonstrated that in settings with staggered treatment adoption, conventional DID estimators can be severely biased due to the contamination of control groups by previously treated units (e.g., \citealp{Goodman-Bacon2021}; \citealp{Callaway2021}; \citealp{Sun2021}; \citealp{deChaisemartin2020}). This paper addresses a parallel but distinct source of control group contamination: spillover effects from contemporaneously treated units on a network. In many applications, such as the evaluation of place-based policies or marketing campaigns, treatment effects are not confined to the treated units but spill over to others. This phenomenon, known as ``interference" \citep{Cox1958}, constitutes a violation of the stable unit treatment value assumption (SUTVA; \citealp{Rubin1980}), a fundamental premise in causal inference.
+
+When interference is present, the control group fails to serve as a valid counterfactual for the absence of treatment. Consequently, a simple comparison between treated and control groups yields a biased estimate of the true causal effect \citep[e.g.,][]{perez2014assessing,Butts2023}. This bias can be severe, potentially reversing the sign of the effect and leading to fundamentally flawed policy implications \citep{leung2024identifying}.
+However, causal inference under interference is inherently challenging because one must account for $2^N$ possible treatment assignments for $N$ units. This complexity makes it nearly impossible to identify meaningful causal effects without imposing structural assumptions \citep{Manski2013}. Early influential work addressing this issue includes studies on social interactions (e.g., \citealp{Manski1993}) and vaccine efficacy (e.g., \citealp{Hudgens2008}).
+
+A more flexible foundation is the concept that a unit's outcome may depend on the entire vector of treatment assignments, formalized by \citet{Manski2013} as the effective treatment. Building on this, \citet{Aronow2017} introduced a systematic framework known as exposure mapping, which summarizes the high-dimensional treatment vector into a low-dimensional ``exposure level." This framework allows researchers to define the structure of interference and estimate causal effects conditional on these exposure levels (e.g., \citealp{Ugander2013}; \citealp{Basse2018}). However, a major practical limitation of this approach is the requirement to pre-specify the interference structure (e.g., the number of treated neighbors required to trigger an effect), which must be known and correctly specified a priori.
+In reality, social and economic interference is often complex and nonlinear, making it rare for researchers to know the correct functional form in advance. The reliance on a known exposure mapping poses a significant risk; in complex real-world networks, misspecification of this mapping can lead to severe bias in causal effect estimates. The difficulty of correctly specifying this mapping and the consequences of misspecification have been highlighted in recent theoretical work, such as \citet{Savje2024}, which investigates the conditions for identification under misspecification and underscores the severity of this issue.
+
+While recent advances in network causal inference, such as the Auto-Doubly Robust (AAIPW) framework proposed by \citet{Liu2025}, have successfully addressed general interference using Markov random fields and Auto-models, these methods often rely on specific parametric structures for nuisance functions. In contrast, our approach leverages the temporal dimension of panel data to identify causal effects nonparametrically. This bypasses the need for a pre-specified exposure mapping—a common requirement in the current DID literature regarding interference (e.g., \citealp{Xu2025})—thereby providing a more robust alternative in settings where the spillover mechanism is poorly understood.
+
+This paper addresses the challenge of unknown interference structures by introducing a new identification strategy that exploits the panel data structure inherent in DID. Instead of relying on a pre-specified exposure mapping to handle high-dimensional interference, we introduce a novel assumption: the parallel trends assumption conditional on the neighborhood treatment vector. This allows us to nonparametrically identify causal effects based solely on this conditional parallel trends assumption, without requiring any pre-specification of the exposure mapping or imposing potentially incorrect functional form assumptions on the spillover structure. We then estimate these effects using flexible estimation methods that remain feasible when conditioning on the neighborhood treatment vector.
+
+% I.3. 表記の統一 (Difference-in-Differences)
+In recent years, there has been a surge of research integrating interference into the DID framework. Early studies in spatial econometrics proposed spatial DID models that account for spillovers from geographically proximate units \citep{Delgado2015}. More closely related to our work is a recent line of research extending this integration to general network structures. While studies such as \citet{Xu2025} and \citet{Butts2023} make important contributions, they typically rely on a pre-specified exposure mapping. Our research aligns with the recent trend of relaxing strong assumptions regarding the functional form of interference (e.g., \citealp{Leung2022}). We contribute to this burgeoning literature by embedding a nonparametric identification strategy—conditioning on the neighborhood treatment vector itself—within the DID framework, which remains the most widely used method for policy evaluation in observational settings.
+
+% II.3. AITTの定義と解釈（新規性）(Introductionでの強調)
+Furthermore, this paper introduces a new perspective on defining indirect effects. Much of the literature, including \citet{Xu2025}, defines the indirect (or spillover) effect as the difference in a unit's own outcome resulting from varying exposure levels. This approach answers the question: ``How would my outcome have changed if my neighborhood's treatment status had been different?" (see also \citealp{TchetgenTchetgen2012}). This corresponds to \textit{inward spillover effects}, focusing on how a unit is affected by its neighbors' treatments. In contrast, we define the Average Indirect Treatment Effect on the Treated (AITT) as the effect of treating a specific unit on its surrounding units. Following the conceptual distinction between inward and outward spillover effects, our AITT estimand quantifies the outward influence of an intervention. This provides a direct measure of policy externalities, shedding light on how localized treatments propagate through network ties to affect the broader community. This corresponds to the question: ``By intervening on unit $i$, how much did the outcomes of its neighbors $j$ change on average?" We posit that this estimand, which directly quantifies the externality of the intervention, provides a more policy-relevant parameter for evaluating spillovers, distinct from the mediated effects typically considered in the literature (e.g., \citealp{Sobel2006}).
+
+Building on this identification result, we provide inverse probability weighted (IPW) estimators and establish asymptotic theory for these estimators. For inference, we adopt the $\psi$-dependence framework of \citet{Kojevnikov2021}. This framework allows for rigorous asymptotic normality when observations are dependent on a single large network, balancing network density and the decay rate of dependence. Such a framework is essential because standard asymptotic theory based on the i.i.d. assumption is not applicable when data exhibit complex dependencies on a network structure.
+
+% III.2. トレードオフ（代償）と位置づけ (Introductionでの言及)
+While our approach offers enhanced robustness against misspecification of the interference structure, it is not without trade-offs. By conditioning directly on the high-dimensional neighborhood treatment vector, our estimators may suffer from reduced efficiency (the curse of dimensionality) compared to methods that correctly specify a low-dimensional exposure mapping, particularly when the network is dense or the sample size is small. Therefore, our method should be viewed as complementary to existing approaches: when the functional form of interference is known, exposure mapping methods are preferred due to their efficiency; when it is unknown, our identification-based approach (nonparametric in identification, flexible parametric in estimation) provides a robust alternative.
+
+% I.1. 章構成の再編 (論文構成の記述修正)
+The remainder of this paper is organized as follows. Section 2 discusses the identification of key causal estimands. Section 3 proposes estimators and discusses inference methods, including variance estimation. Section 4 establishes the asymptotic properties of the estimators. Section 5 presents simulation evidence, and Section 6 concludes.
+
+%----------------------------------------%
+%         Identification                 %
+%----------------------------------------%
+\section{Identification}
+
+This section presents the framework for identifying causal effects under network interference. We first define the basic setup, potential outcomes, and the statistical framework. We then introduce the two causal parameters of interest: the Average Direct Treatment Effect on the Treated (ADTT) and the Average Indirect Treatment Effect on the Treated (AITT). We discuss the assumptions required to identify these parameters, particularly an extension of the parallel trends assumption, and prove the main identification theorems.
+
+
+
+\subsection{Setup and potential outcomes}
+
+We consider a population of $n$ units, $i\in I_n$, connected by a network with adjacency matrix $A$, where $l_A(i,j)$ denotes the shortest path length. We use two-period panel data ($t=1,2$) with treatment indicator $D_i$ and outcome $Y_{ti}$. We adopt a finite population perspective where inference is conditional on fixed attributes $z_i$. 
+
+%
+We consider a setting characterized by interference (spillover effects), violating the stable unit treatment value assumption (SUTVA). We specifically assume that interference is local and occurs along the network structure.
+
+To systematically handle the neighborhood structure while maintaining a fixed dimensionality for estimation, we define the neighborhood of unit $i$, denoted by $N_i$, as the set of its $L$ nearest neighbors on the network, where $L$ is a fixed number chosen by the researcher. Specifically, for each unit $i$, we sort all units $j \in I_n \setminus \{i\}$ by their network distance $l_A(i,j)$ in ascending order, and take the first $L$ units to form the neighborhood $N_i$. Let $\boldsymbol{D}_{N_i} \in \{0,1\}^{L}$ denote the treatment vector of these neighbors, sorted by their distance from unit $i$. That is, for $k = 1, \ldots, L$, the $k$-th component of $\boldsymbol{D}_{N_i}$ corresponds to the treatment indicator of the $k$-th nearest neighbor in $N_i$.
+
+For the asymptotic theory developed in Section 4, we assume that interference is confined to a distance of $K$, where $K$ denotes the theoretical interference range (the maximum network distance within which units can affect each other). We define the neighborhood within distance $K$ for the $i$th unit as
+$$
+N(i;K) = \{ j\in I_n\setminus\{i\} \mid l_A(i,j)\leq K\}.
+$$
+For any unit $j$, we also define $N(j;K)^+ = N(j;K) \cup \{j\}$ as the extended neighborhood that includes unit $j$ itself. We also define $N^{\partial}(i; s) = \{ j \in I_n \mid l_A(i, j) = s \}$ as the set of units at exactly distance $s$ from unit $i$. When considering the treatment vector for unit $j$'s neighborhood excluding unit $i$, we denote this as $\boldsymbol{d}_{N(j;K)}^{+, -i} \in \{0, 1\}^{|N(j;K)^+ \setminus \{i\}|}$, which represents the treatment assignment vector for all units in $j$'s extended neighborhood except for unit $i$.
+
+% I.3. 表記の統一 (確率変数と実現値の使い分け)
+Under this setting, we define $y_{ti}(d_i, \bd_{N_i})$ as the potential outcome for unit $i$ when its own treatment status is fixed at $d_i\in \{0,1\}$ and its neighborhood treatment vector is fixed at $\bd_{N_i}\in \{0,1\}^{L}$.
+This formulation is general and encompasses structures such as $y_{2i}(d_i, \bd_{N_i}) = m(Y_{1i}, d_i, \bd_{N_i}, \epsilon_i)$, where $\epsilon_i$ is an error term. A key feature of this formulation is that it allows the entire combination of neighborhood treatments, $\bd_{N_i}$, to affect the outcome, without requiring a specific functional form like an exposure mapping, which is often assumed in literature \citep{Hudgens2008,Ugander2013}. By using a fixed-length vector $\bd_{N_i}$ based on the $L$ nearest neighbors, we ensure that the dimensionality of the conditioning set remains constant across units, facilitating practical implementation while maintaining the nonparametric identification strategy.
+
+% II.1. Potential Outcome定義時の記述整理 (不要な箇条書きの削除)
+% 元のドラフトでコメントアウトされていた部分を削除
+
+
+
+%
+\subsection{Causal estimands}
+
+Under the setup described in the previous section, we first define the direct effect.
+%
+\begin{df}
+% I.3. 表記の統一 (確率変数の使用)
+Average Direct Treatment Effect on the Treated (ADTT) is defined as 
+$$
+\tau_{\mathrm{dir}} = \frac{1}{n} \sum_{i=1}^n E[y_{2i}(1, \bD_{N_i}) - y_{2i}(0, \bD_{N_i}) \mid D_i=1, z_i],
+$$
+where the expectation $E[\cdot]$ is taken over the stochastic unobservables for unit $i$, conditional on its treatment status and its fixed attributes $z_i$. 
+\end{df}
+
+This estimand averages the causal effect over the subpopulation of units that are actually treated, marginalized over the distribution of neighborhood treatment vectors.
+% II.2. ADTTの定義と位置づけ (既存研究との関係性の明確化)
+This definition of ADTT is standard in the literature on causal inference under interference \citep[e.g.,][]{Aronow2017, Xu2025}. It measures the expected difference in outcomes for the treated units between being treated and not being treated, holding their observed neighborhood treatment status $\bD_{N_i}$ fixed. The expectation is taken over the observed distribution of neighborhood treatment vectors. 
+
+%
+While the definition of the estimand is the same, the identification and estimation strategies differ significantly. Prior work often relies on an exposure mapping that reduces the high-dimensional treatment assignment vector to a low-dimensional exposure level \citep[e.g.][]{Hudgens2008,Aronow2017,Xu2025}. Our key contribution regarding ADTT is that we achieve nonparametric identification without assuming a known exposure mapping. We do this by conditioning directly on the observed neighborhood treatment vector $\bD_{N_i}$. This avoids the risk of misspecification inherent in exposure mapping and allows nonparametric identification of the direct effect.
+
+%
+% II.3. AITTの定義と解釈（新規性）(解釈と既存研究との違いの明確化)
+Next, we define the indirect effect. 
+We introduce a new estimand called Average Indirect Treatment Effect on the Treated (AITT), which differs from definitions commonly used in prior studies.
+
+%
+\begin{df}
+The Average Indirect Treatment Effect on the Treated (AITT) is defined as
+$$
+\tau_{\mathrm{ind}} = \frac{1}{n} \sum_{i=1}^n \left( \frac{1}{|N_i|} \sum_{j \in N_i} E\Big[\Delta y_{2j} | D_i = 1, z_i, z_j \Big] \right),
+$$
+where $\Delta y_{2j} = y_{2j}(D_j, \bD_{N_j}^{(1)}) - y_{2j}(D_j, \bD_{N_j}^{(0)})$, and $\bD_{N_j}^{(d)}$ denotes the treatment vector of the neighbors of $j$ with $D_i=d\in \{0,1\}$.
+Here, the expectation $E[\cdot]$ is taken over the stochastic unobservables of each neighbor $j$, conditional on the fixed attributes $z_i$ and $z_j$. 
+\end{df}
+
+
+The AITT quantifies the average externality imposed on neighbors by the intervention on treated units within the finite population. Intuitively, while the inner sum captures the effect on individual neighbors, the outer aggregation represents the total ``spillover footprint'' generated by treating unit $i$, effectively measuring the total outward influence of the intervention.
+The AITT is a novel estimand introduced in this paper. It measures the average effect of the treatment of unit $i$ on the outcomes $Y_{2j}$ of its neighbors $j$, averaged over the population of treated units ($D_i=1$). This estimand directly quantifies the externality of the intervention, answering the policy-relevant question: ``By intervening on unit $i$, how much did the outcomes of its neighbors $j$ change on average?"
+
+%
+This definition contrasts with standard definitions of indirect (or spillover) effects found in the literature \citep[e.g.,][]{TchetgenTchetgen2012, Xu2025}. Existing definitions typically focus on the effect of changes in neighborhood exposure on a unit's \textit{own} outcome (i.e., ``How would my outcome change if my neighbors' treatment status were different?"). 
+Our AITT instead captures the outgoing spillover effect generated by the treatment of unit $i$.
+
+
+
+%
+\subsection{Identification results}
+
+To identify these parameters, we require an assumption about the unobserved counterfactuals. We extend the standard parallel trends assumption in DID to accommodate network interference. 
+
+\begin{as}[No anticipation] \ 
+\label{as:NoAnticipation}
+$E[y_{1i} | \bD_{I_n}, z_i] = y_{1i} (z_i)$.
+\end{as}
+
+%
+\begin{as}[Conditional parallel trends under interference]
+\label{as:trend}\
+For all $i \in I_n$ and $\bd_{N_i} \in \{0,1\}^{L}$, it holds that 
+\begin{align*}
+& E[y_{2i}(0, \bd_{N_i}) - y_{1i}  | D_i=1, \bD_{N_i} = \bd_{N_i}, z_i] \\
+& = E[y_{2i}(0, \bd_{N_i}) - y_{1i}  | D_i=0, \bD_{N_i} = \bd_{N_i}, z_i]
+\end{align*}
+Furthermore, for all $j \in N_i$, and $ \boldsymbol{d}_{N_j}^{-i} \in \{0, 1\}^{L-1} $, it holds that  
+\begin{align*}
+& E[y_{2j}(D_i=0, D_j, \boldsymbol{D}_{N_j}^{-i} = \boldsymbol{d}_{N_j}^{-i}) - y_{1j} \mid D_i=1, D_j, \boldsymbol{D}_{N_j}^{-i} = \boldsymbol{d}_{N_j}^{-i}, z_i, z_j] \\
+& = E[y_{2j}(D_i=0, D_j, \boldsymbol{D}_{N_j}^{-i} = \boldsymbol{d}_{N_j}^{-i}) - y_{1j} \mid D_i=0, D_j, \boldsymbol{D}_{N_j}^{-i} = \boldsymbol{d}_{N_j}^{-i}, z_i, z_j]
+\end{align*}
+\end{as}
+
+\begin{as}[Sufficiency and locality of L-neighborhood]
+\label{as:neighborhood_sufficiency}\
+We assume that the chosen number of neighbors $L$ is sufficient to capture the relevant interference. Furthermore, to ensure the validity of the asymptotic properties derived based on network distance, we assume that for all $i \in I_n$ and for all $j \in N_i$, the network distance satisfies $l_A(i, j) \leq K$. That is, the $L$-neighborhood $N_i$ is contained within the theoretical interference range $K$: $N_i \subseteq \{j \in I_n \setminus \{i\} \mid l_A(i, j) \leq K\}$.
+\end{as}
+
+% II.4. Assumption 1（Conditional Parallel Trends）の説明強化 (CPTAとの関連付け、妥当性の議論)
+% III.1. Exposure Mappingを用いないアプローチのメカニズム
+Assumption~\ref{as:NoAnticipation} is known as ``no-anticipation assumption" that requires that the potential outcome in the first time period prior to treatment does not depend on treatments.
+Assumption~\ref{as:trend} states that, conditional on the treatment status of all other units in the relevant neighborhood, the expected outcome trend under no treatment ($D_i=0$) is the same regardless of the actual treatment status of unit $i$. 
+This is a natural extension of the standard conditional parallel trends assumption (CPTA) often employed in DID analysis with covariates \citep{abadie2005semiparametric}. In the standard CPTA, parallel trends are assumed to hold conditional on a set of observed covariates. Here, we extend this logic to the network setting by conditioning on the neighborhood treatment vector $\bD_{N_i}$. This conditioning is the key mechanism that enables identification without relying on an exposure mapping. By controlling for the exact configuration of neighborhood treatments, we substitute a structural assumption on the interference function with an assumption on the counterfactual trends.
+While this assumption is stronger than the standard unconditional parallel trends assumption, it is analogous to assumptions made in other recent work on nonparametric identification under network interference. For instance, \citet{Leung2022} employs a similar conditioning strategy (conditioning on neighborhood covariates and treatment assignments) to achieve identification in a cross-sectional setting.
+
+Assumption~\ref{as:neighborhood_sufficiency} bridges the gap between the theoretical interference range $K$ and the practical implementation using a fixed number of neighbors $L$. It ensures that the chosen neighborhood $N_i$ captures all relevant interference effects (sufficiency) and that the asymptotic theory based on network distance remains valid (locality). Specifically, by requiring that all units in the $L$-neighborhood $N_i$ are within distance $K$ from unit $i$, this assumption guarantees that the estimators based on $L$-neighborhoods satisfy the mixing conditions and weak dependence properties derived under the theoretical interference range $K$. This assumption is reasonable in practice when $L$ is chosen to be sufficiently large relative to the network structure and the expected interference range.
+
+%
+Under Assumptions~\ref{as:NoAnticipation}, \ref{as:trend}, and \ref{as:neighborhood_sufficiency}, we can show that both ADTT and AITT are identified as given in the following theorems. The proofs are deferred to the Appendix. 
+
+\begin{thm}
+\label{thm:identification_ADTT}
+Under Assumptions~\ref{as:NoAnticipation}, \ref{as:trend}, and \ref{as:neighborhood_sufficiency}, ADTT is identified as
+$$
+\tau_{\mathrm{dir}} = \frac{1}{n} \sum_{i=1}^n E \left[ \frac{D_i - e_i(\bD_{N_i}, z_i)}{\pi_i(z_i) \{1-e_i(\bD_{N_i}, z_i)\}} ( Y_{2i} - Y_{1i} ) \mid z_i \right],
+$$
+where $\pi_i(z_i) \equiv P(D_i=1|z_i)$ is the marginal probability of $D_i=1$ conditional on $z_i$, and $e_i(\bD_{N_i}, z_i) = P(D_i = 1 | \bD_{N_i}, z_i)$ is the propensity score conditional on the neighborhood treatment vector $\bD_{N_i}$ and $z_i$. Note that $e_i$ is a function of both $\bD_{N_i}$ and $z_i$. This weighting scheme adjusts not only for individual selection into treatment but also for the specific configuration of the neighborhood treatments, ensuring comparisons between units with similar exposure to local interference.
+\end{thm}
+
+\begin{thm}
+\label{thm:identification_AITT}
+Under Assumptions~\ref{as:NoAnticipation}, \ref{as:trend}, and \ref{as:neighborhood_sufficiency}, AITT is identified as
+$$
+\tau_{\mathrm{ind}} = \frac{1}{n} \sum_{i=1}^n \left( \frac{1}{|N_i|} \sum_{j \in N_i} E \left[ \frac{D_i - e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)}{\pi_i(z_i)\{1-e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)\}} (Y_{2j} - Y_{1j}) \mid z_i, z_j \right] \right),
+$$
+where $e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j) = P(D_i = 1 | D_j, \bD_{N_j}^{-i}, z_i, z_j)$ is the propensity of unit $i$ being treated, conditional on the treatment status of its neighbor $j$, $j$'s other neighbors, and the fixed attributes $z_i$ and $z_j$. Note that $e'_{ij}$ is a function of $D_j$, $\bD_{N_j}^{-i}$, $z_i$, and $z_j$.
+\end{thm}
+
+% 元のドラフトのTheorem 1をTheorem 1とTheorem 2に分割した。
+
+%----------------------------------------%
+% I.1. 章構成の再編 (Section 3を新設)
+%    Estimation and Inference Method     %
+%----------------------------------------%
+\section{Estimation and Inference}
+
+Building on the identification results in Section 2, we here propose estimators for the ADTT and AITT and provide methods for statistical inference.
+
+The identification results in Section 2 are nonparametric: they require no functional form assumption on the interference structure and condition only on the neighborhood treatment vector $\bD_{N_i}$ (and covariates). In finite samples, however, conditioning on a high-dimensional vector entails the curse of dimensionality. To maintain practical feasibility and statistical performance, we therefore implement estimation using flexible parametric models—specifically, logistic regression for propensity scores and linear regression for outcome regressions—that use the full vector of neighbor treatments (e.g., distance-ranked indicators $D_{(k)}$) as covariates. These specifications can be viewed as parametric approximations to the nonparametric conditional expectations; researchers may alternatively employ machine learning methods for the nuisance functions when appropriate. The key point is that the \textit{identification} strategy remains nonparametric, whereas the \textit{estimation} step uses flexible parametric (or ML) approximations to make the approach practicable.
+
+\subsection{Inverse probability weighted estimator}
+% 元のSection 3.2を移動
+
+% I.3. 表記の統一 (Inverse Probability Weighting)
+Based on Theorems \ref{thm:identification_ADTT} and \ref{thm:identification_AITT}, we propose the Inverse Probability Weighted (IPW) estimators for the ADTT and AITT, as follows: 
+\begin{equation}\label{eq:IPW}
+\widehat{\tau}_{\mathrm{dir}} = \frac{1}{n} \sum_{i=1}^n \frac{D_i - \widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)\{1 - \widehat{e}_i(\bD_{N_i}, z_i)\}} (Y_{2i} - Y_{1i}),
+\end{equation}
+\begin{equation}
+\widehat{\tau}_{\mathrm{ind}} = \frac{1}{n} \sum_{i=1}^n \left\{ \frac{1}{|N_i|} \sum_{j \in N_i} \left\{ \frac{D_i - \widehat{e}'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)}{\widehat{\pi}_i(z_i)\{1 - \widehat{e}'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)\}} (Y_{2j} - Y_{1j}) \right\} \right\}.
+\end{equation}
+% 推定量の表記を\widehat{P}(D_i = 1)から\widehat{\pi}_iに変更
+Here, $\widehat{\pi}_i(z_i)$, $\widehat{e}_i(\bD_{N_i}, z_i)$, and $\widehat{e}'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)$ are estimators of $\pi_i(z_i)$, $e_i(\bD_{N_i}, z_i)$ and $e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)$,  respectively. 
+
+We estimate propensity scores using logistic regression. For ADTT, the model conditions on unit $i$'s covariates $z_i$ and the treatment statuses of its $L$ nearest neighbors, $\bD_{N_i}$, sorted by distance:
+$$
+\text{logit}(P(D_i=1)) = \alpha + \beta^\top z_i + \sum_{k=1}^L \gamma_k D_{(k)}.
+$$
+This specification is a flexible parametric approximation to $P(D_i=1\mid \bD_{N_i}, z_i)$ that avoids pre-specifying an exposure mapping but remains feasible in finite samples. By including the treatment indicators $D_{(k)}$ individually rather than aggregating them (e.g., into a sum), the model naturally captures heterogeneous spillover effects where the impact decays with distance or depends on the specific proximity of treated neighbors.
+Similarly, for AITT, we estimate $e'_{ij}$ conditioning on covariates $z_i,z_j$, neighbor's treatment $D_j$, and the distance-sorted treatments of $j$'s other neighbors $\bD_{N_j}^{-i}$.
+
+In both cases, the feature vectors have a fixed dimensionality determined by the number of covariates in $z_i$ (and $z_j$ for AITT) plus $L$ neighbor treatment indicators, ensuring computational feasibility while maintaining the nonparametric \textit{identification} strategy (with parametric models used for \textit{estimation}). The specific covariates used in the real data application are detailed in Section 6. 
+
+% II.2. ADTTの定義と位置づけ (既存推定量との違いの記述)
+Our proposed ADTT estimator differs from existing IPW estimators under interference, such as the one proposed by \citet{Xu2025}. While both utilize an IPW structure, the key difference lies in the conditioning set for the propensity score. Existing methods typically estimate the propensity score conditional on a low-dimensional, pre-specified exposure mapping $G_i$, i.e., $P(D_i=1|G_i)$. In contrast, our estimator uses the propensity score conditional on the full neighborhood treatment vector, $e_i = P(D_i = 1 | \bD_{N_i})$. This approach, which follows our nonparametric identification strategy, avoids the risk of misspecifying the exposure mapping, leading to more robust estimation of the direct effect.
+
+% III.2. トレードオフ（代償）と位置づけ (Section 3での言及)
+However, this robustness comes at a cost. Estimating the propensity score conditional on a high-dimensional vector $\bD_{N_i}$ can be challenging, particularly when the number of neighbors $L$ is large (the curse of dimensionality). This may lead to reduced statistical efficiency compared to methods that correctly specify a low-dimensional exposure mapping. If researchers have strong prior knowledge about the functional form of interference, using an exposure mapping approach might be more efficient. When such knowledge is unavailable, our estimators that implement the nonparametric identification offer a robust alternative.
+
+%For simplicity, in the asymptotic analysis presented in Section 4, we assume these propensity scores are known.
+
+
+\subsection{Doubly robust estimator}
+
+While the IPW estimators introduced above are based on our nonparametric identification strategy, they depend on the correct specification of the propensity score models $\widehat{e}_i(\bD_{N_i}, z_i)$ and $\widehat{e}'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)$. To improve robustness against model misspecification, we propose doubly robust (DR) estimators that combine the IPW approach with outcome regression models. The key advantage of DR estimators is that they remain consistent if either the propensity score model or the outcome regression model is correctly specified, providing protection against misspecification of one of these components.
+
+To construct the DR estimators, we first define outcome regression models that align with our identification assumptions. For ADTT, we define the conditional expectation functions:
+\begin{align*}
+\mu_{1i}(\bD_{N_i}, z_i) &= E[Y_{2i} - Y_{1i} | D_i=1, \bD_{N_i}, z_i], \\
+\mu_{0i}(\bD_{N_i}, z_i) &= E[Y_{2i} - Y_{1i} | D_i=0, \bD_{N_i}, z_i].
+\end{align*}
+These functions condition on the full neighborhood treatment vector $\bD_{N_i}$, ensuring consistency with Assumption~\ref{as:trend}. For AITT, we define similar outcome regression models for neighbor $j$'s outcomes, conditioning on $D_i$, $D_j$, and $\bD_{N_j}^{-i}$:
+\begin{align*}
+\mu_{1ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j) &= E[Y_{2j} - Y_{1j} | D_i=1, D_j, \bD_{N_j}^{-i}, z_i, z_j], \\
+\mu_{0ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j) &= E[Y_{2j} - Y_{1j} | D_i=0, D_j, \bD_{N_j}^{-i}, z_i, z_j].
+\end{align*}
+
+Based on these outcome regression models, we propose the following DR estimators. Here, we denote the observed outcome difference as $\Delta Y_i = Y_{2i} - Y_{1i}$ (and similarly for $\Delta Y_j$). The predicted outcome differences are defined as:
+\begin{align*}
+\Delta m_{1i} &= \widehat{\mu}_{1i}(\bD_{N_i}, z_i), \\
+\Delta m_{0i} &= \widehat{\mu}_{0i}(\bD_{N_i}, z_i), \\
+\Delta m'_{1,ij} &= \widehat{\mu}_{1ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j), \\
+\Delta m'_{0,ij} &= \widehat{\mu}_{0ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j),
+\end{align*}
+where $\widehat{\mu}_{1i}$, $\widehat{\mu}_{0i}$, $\widehat{\mu}_{1ij}$, and $\widehat{\mu}_{0ij}$ are the estimators of the corresponding outcome regression functions defined above.
+
+We estimate outcome regression models using linear regression. For ADTT, we regress $\Delta Y_i$ on $D_i$, $z_i$, and the distance-sorted neighbor treatments $\bD_{N_i}$. Predictions $\Delta m_{1i}$ and $\Delta m_{0i}$ are obtained by setting $D_i=1$ and $D_i=0$, respectively.
+For AITT, we regress $\Delta Y_j$ on $D_i$, $D_j$, $z_i$, $z_j$, and the sorted neighbor treatments $\bD_{N_j}^{-i}$. Predictions are generated by fixing $D_i$. While we use OLS, flexible methods like machine learning can also be employed.
+\begin{equation}\label{eq:DR_ADTT}
+\begin{split}
+\widehat{\tau}_{\mathrm{dir}}^{dr} & = \frac{1}{n} \sum_{i = 1}^n \Bigg\{\frac{D_i}{\widehat{\pi}_i}\left(\Delta Y_i-\Delta m_{1i}\right) \\
+& -\frac{(1-D_i)\widehat{e}_i}{\widehat{\pi}_i(1-\widehat{e}_i)}\left(\Delta Y_i-\Delta m_{0i}\right) + \frac{\widehat{e}_i}{\widehat{\pi}_i}\left(\Delta m_{1i}-\Delta m_{0i} \right)\Bigg\},
+\end{split}
+\end{equation}
+and for AITT,
+\begin{equation}\label{eq:DR_AITT}
+\begin{split}
+\widehat{\tau}_{\mathrm{ind}}^{dr} &= \frac{1}{n}\sum_{i=1}^n \Bigg\{\frac{1}{|N_i|}\sum_{j\in N_i}
+\Bigg(\frac{D_i}{\widehat{\pi}_i}\left( \Delta Y_j-\Delta m^{'}_{1,ij}\right)\\
+& -\frac{(1-D_i)\widehat{e'}_{ij}}{\widehat{\pi}_i(1-\widehat{e'}_{ij})}\left(\Delta Y_j-\Delta m^{'}_{0,ij}\right) + \frac{\widehat{e'}_{ij}}{\widehat{\pi}_i}(\Delta m^{'}_{1,ij}-\Delta m^{'}_{0,ij})\Bigg) \Bigg\}.
+\end{split}
+\end{equation}
+
+Structurally, these estimators consist of the standard IPW component augmented by bias-correction terms derived from the outcome regression models. If the propensity score is misspecified, these regression terms correct the residual bias, and conversely, the IPW weights ensure consistency if the outcome model is incorrect. Here, $\widehat{e}_i$ and $\widehat{e}'_{ij}$ are shorthand notations for $\widehat{e}_i(\bD_{N_i}, z_i)$ and $\widehat{e}'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)$, respectively. Thus, the DR estimators possess the double robustness property: they are consistent for ADTT and AITT if either the propensity score models ($\widehat{e}_i$, $\widehat{e}'_{ij}$) or the outcome regression models ($\widehat{\mu}_{1i}$, $\widehat{\mu}_{0i}$, $\widehat{\mu}_{1ij}$, $\widehat{\mu}_{0ij}$) are correctly specified. This property provides substantial protection against model misspecification, as researchers need only correctly specify one of the two model components rather than both. When both models are correctly specified, the DR estimators typically achieve improved efficiency compared to the IPW estimators alone.
+
+
+\subsection{Variance estimation}
+% 元のSection 4を移動
+
+% I.3. 表記の統一 (Heteroskedasticity and Autocorrelation Consistent)
+To conduct statistical inference on ADTT and AITT, we need an estimator for the (asymptotic) variance of $\widehat{\tau}_{\mathrm{dir}}$ and $\widehat{\tau}_{\mathrm{ind}}$. 
+Under network dependence, standard variance estimators are inconsistent due to the correlation among observations. This issue is particularly pronounced in applications, such as those analyzed by \cite{conley1999gmm}, where geographically proximate agents or firms within the same industry are subject to common shocks, leading to correlated disturbances that standard estimators do not account for.
+Therefore, we employ a heteroskedasticity and autocorrelation consistent (HAC) estimator that accounts for the network dependence structure, following \citet{Kojevnikov2021}.
+Specifically, we consider the following kernel-based HAC estimator:
+\begin{equation}\label{eq:HAC}
+\widehat{V}_n = \sum_{s \geq 0} \omega\left(\frac{s}{b_n}\right) \widehat{\Omega}_n(s),
+\end{equation}
+where $\omega$ is a kernel function satisfying $\omega(0) = 1$, having a finite support, and being symmetric. 
+Examples include Bartlett and Parzen kernels. 
+The term $b_n$ is a bandwidth parameter that increases with $n$. In practice, the bandwidth $b_n$ is typically selected based on the network structure and the interference range $K$. Following the framework of \citet{Kojevnikov2021}, we set the bandwidth as a multiple of the interference range $K$ (e.g., $b_n = c \cdot K$ for some constant $c > 0$), which accounts for the local dependence structure on the network. 
+$\widehat{\Omega}_n(s)$ is the sample autocovariance matrix at distance $s$, given by:
+$$
+\widehat{\Omega}_n(s) = n^{-1} \sum_{i \in I_n} \sum_{j \in N^{\partial}(i; s)} (\phi_i - \bar{\phi}_n)(\phi_j - \bar{\phi}_n)
+$$
+where $N^{\partial}(i; s)$ is the set of units at exactly distance $s$ from unit $i$ (as defined in Section 2), and $\phi_i$ is the influence function of the estimand as follows:
+\begin{equation}\label{eq:Z}
+\begin{split}
+{\rm (ADTT)} \ \ \ &
+\phi_i^{\mathrm{dir}} = \frac{D_i - e_i(\bD_{N_i}, z_i)}{\pi_i(z_i) \{1-e_i(\bD_{N_i}, z_i)\}} ( Y_{2i} - Y_{1i} ),\\
+{\rm (AITT)} \ \ \ &
+\phi_i^{\mathrm{ind}} = \frac{1}{|N_i|} \sum_{j \in N_i} \left\{ \frac{D_i - e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)}{\pi_i(z_i)\{1-e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j)\}} (Y_{2j} - Y_{1j}) \right\}.
+\end{split}
+\end{equation}
+Here $\bar{\phi}_n$ is its sample mean.
+
+When using the DR estimators introduced in Section 3.2, the influence function $\phi_i$ should be replaced with the corresponding summand from the DR estimator. Specifically, for the DR estimators, the influence functions are:
+\begin{equation}\label{eq:Z_DR}
+\begin{split}
+{\rm (ADTT)} \ \ \ &
+\phi_i^{DR,\mathrm{dir}} = \frac{D_i}{\widehat{\pi}_i}\left(\Delta Y_i-\Delta m_{1i}\right) -\frac{(1-D_i)\widehat{e}_i}{\widehat{\pi}_i(1-\widehat{e}_i)}\left(\Delta Y_i-\Delta m_{0i}\right) + \frac{\widehat{e}_i}{\widehat{\pi}_i}\left(\Delta m_{1i}-\Delta m_{0i} \right),\\
+{\rm (AITT)} \ \ \ &
+\phi_i^{DR,\mathrm{ind}} = \frac{1}{|N_i|} \sum_{j \in N_i} \Bigg\{ \frac{D_i}{\widehat{\pi}_i}\left( \Delta Y_j-\Delta m^{'}_{1,ij}\right) \\
+& -\frac{(1-D_i)\widehat{e'}_{ij}}{\widehat{\pi}_i(1-\widehat{e'}_{ij})}\left(\Delta Y_j-\Delta m^{'}_{0,ij}\right) + \frac{\widehat{e'}_{ij}}{\widehat{\pi}_i}(\Delta m^{'}_{1,ij}-\Delta m^{'}_{0,ij}) \Bigg\}.
+\end{split}
+\end{equation}
+
+%
+This estimator robustly captures the local dependence structure by accounting for the covariance between units that are close on the network and down-weighting pairs of units as the distance between them increases. As shown in the subsequent section, the HAC estimator $\widehat{V}_n$ is consistent as $n \to \infty$. 
+Based on the variance estimator, one can make statistical inference on ADTT or AITT.
+For example, the Wald-type $100(1-\alpha)\%$ confidence interval of ADTT can be constructed as $\widehat{\tau}_{\mathrm{dir}}\pm z_{\alpha/2}\sqrt{\widehat{V}_n/n}$.
+%consistently estimates the asymptotic variance of the normalized estimator, i.e., $\widehat{V}_n \to \sigma_{n,D}^2$ for ADTT and $\widehat{V}_n \to \sigma_{n,I}^2$ for AITT as $n \to \infty$.
+
+
+
+%To ensure the consistency of the HAC estimator, additional assumptions regarding the kernel function, the rate of increase of the bandwidth, and the network's dependence structure are required. These assumptions (detailed in Assumption \ref{as:HAC} in Section 4) regulate the balance between the network's density and the rate of decay of its dependence. Theorem \ref{thm:HAC} in Section 4 formally establishes the consistency of the HAC estimator $\widehat{V}_n$ under these conditions.
+
+
+
+%----------------------------------------%
+% I.1. 章構成の再編 (Section 4を新設)
+%      Asymptotic Inference              %
+%----------------------------------------%
+\section{Asymptotic Properties}
+
+This section establishes the large-sample properties (consistency and asymptotic normality) of the proposed estimators. Since data on a network structure exhibit complex dependencies, standard asymptotic theory based on the i.i.d. assumption is not applicable. We therefore employ modern theory for weakly dependent random fields, specifically the framework of $\psi$-dependence introduced by \citet{Kojevnikov2021}, to provide rigorous proofs. This approach is also related to the analysis of approximate neighborhood interference by \citet{Leung2022}.
+
+\subsection{Local dependence on networks}
+% 元のSection 3.1を移動。タイトル変更 (IV.1)
+
+First, we define the concept of weak dependence on which our analysis relies. $\psi$-dependence is a measure of the strength of dependence based on the covariance of non-linearly transformed variables.
+
+\begin{df}[$\psi$-dependence]
+A collection of random variables $\{\phi_i\}_{i=1 \ldots n}$ is said to be $\psi$-dependent if there exist a set of non-negative functions $\{\psi_{h,h'}(\cdot,\cdot)\}$ and a uniformly bounded sequence $\{\tilde{\theta}_{n, s}\}$ with $\tilde{\theta}_{n, 0} = 1$ such that for any $n, h, h', s > 0$, any bounded Lipschitz functions $f \in L_h, f' \in L_{h'}$, and any pair of sets $(H, H') \in \mathcal{P}_n(h, h', s)$ separated by a network distance of at least $s$, the following holds:
+$$
+|\text{Cov}(f(\phi_H), f'(Z_{H'}))| \leq \psi_{h,h'}(f,f') \tilde{\theta}_{n, s}
+$$
+where $\mathcal{P}_n(h, h', s) = \{(H, H') \mid l_A(H, H') \geq s, |H| = h, |H'| = h' \}$, $\mathcal{L}_{a}$ denotes the collection of bounded Lipschitz real functions on $\mathbb{R}^{a}$, i.e., $\mathcal{L}_{a} = \{ f : \mathbb{R}^{a} \to \mathbb{R} : \|f\|_{\infty} < \infty, \ \mathrm{Lip}(f) < \infty \}$ with $\mathrm{Lip}(f)$ denoting the Lipschitz constant of $f$,$^6$ and $\|\cdot\|_{\infty}$ the sup-norm of $f$, i.e., $\|f\|_{\infty} = \sup_x |f(x)|.$ 
+\end{df}
+
+\noindent
+This definition requires the dependence coefficient $\tilde{\theta}_{n, s}$ to decay as the distance $s$ increases.
+
+\subsection{Assumptions}
+% 元のSection 3.3と4.2の仮定を移動・統合
+
+To derive the large-sample properties of our estimators, we introduce a set of regularity conditions regarding the scope of interference, stochastic properties, and the overall dependence structure of the network.
+
+\begin{as}[Local interference]
+\label{as:local_interference}
+Interference is limited to a distance $K$. That is, the fundamental variables for unit $i$, $(Y_{1i}, D_i, \epsilon_i)$, do not depend on the treatment of units beyond distance $K$. For all $i \in I_n$ and for all $\bD_{-i} \in \{0, 1\}^{n-1}$:
+$$
+P(Y_{1i}, D_i, \epsilon_i | \bD_{-i} = \bd_{-i}) = P(Y_{1i}, D_i, \epsilon_i | \bD_{N(i; K)} = \bd_{N(i; K)}).
+$$
+\end{as}
+
+\begin{as}[Overlap]
+\label{as:overlap}
+All propensity scores are uniformly bounded away from 0 and 1. That is, there exist $\underline{\pi}, \overline{\pi} \in (0, 1)$ such that for all $i, j \in I_n$, $\pi_i(z_i) = P(D_i = 1 | z_i) \in [ \underline{\pi}, \overline{\pi} ]$, $e_i(\bD_{N_i}, z_i) = P(D_i = 1 | \bD_{N_i}, z_i) \in [ \underline{\pi}, \overline{\pi} ]$ and $e'_{ij}(D_j, \bD_{N_j}^{-i}, z_i, z_j) = P(D_i = 1 | D_j, \bD_{N_j}^{-i}, z_i, z_j) \in [ \underline{\pi}, \overline{\pi} ]$.
+
+%\begin{itemize}
+% \pi_iを使用
+%\item $\pi_i = P(D_i = 1) \in [ \underline{\pi}, \overline{\pi} ]$
+%\item $e_i = P(D_i = 1 | \bD_{N(i;K)}) \in [ \underline{\pi}, \overline{\pi} ]$
+%\item $e'_{ij} = P(D_i = 1 | D_j, \bD_{N(j;K)}^{-i}) \in [ \underline{\pi}, \overline{\pi} ]$
+%\end{itemize}
+\end{as}
+
+
+\begin{as}[Bounded outcomes]
+\label{as:bounded_outcomes}
+Outcomes are uniformly bounded. That is, there exists a constant $\overline{Y} < \infty$ such that for all $i \in I_n$, $|Y_{1i}|, |Y_{2i}| < \overline{Y}$ almost surely.
+\end{as}
+
+Next, we introduce an assumption about the dependence structure on the network. Let $x_i = (Y_{1i}, D_i, \epsilon_i)$. We assume that the collection of these fundamental random variables $\{x_i\}$ is spatially weakly dependent. Specifically, we assume a spatial $\alpha$-mixing condition of the type considered in \citet{Jenish2009}. Limit theorems for such dependence structures have been developed in a series of papers by the same authors (e.g., \citealp{Jenish2009, Jenish2012}).
+
+\begin{as}[$\alpha$-mixing]
+\label{as:alpha_mixing}\
+Let $\alpha_n(H, H') = \alpha(\sigma_n(\{x_i\}_{i \in H}), \sigma_n(\{x_i\}_{i \in H'}))$, where $\sigma(\cdot)$ denotes the $\sigma$-algebra generated by the collection of random variables. There exist a bounded function $\psi(\cdot, \cdot): \mathbb{N} \times \mathbb{N} \rightarrow \mathbb{R}$ and a sequence $\{\widehat{\alpha}(s)\}_{s \in \mathbb{R}}$ such that for $\bar{\alpha}(h, h', s) = \sup_n \sup_{H, H'} \{ \alpha_n(H, H') \mid |H| \leq h, |H'| \leq h', l_A(H, H') \geq s \}$, we have:
+$$
+\bar{\alpha}(h, h', s) \leq \psi(h, h') \widehat{\alpha}(s)
+$$
+where $\widehat{\alpha}(s) \to 0$ as $s \to \infty$. This assumption governs the strength of the underlying spatial dependence in the observed data.
+\end{as}
+
+\noindent
+The following technical assumptions specify the trade-off between this decay rate and the network's density, ensuring the Law of Large Numbers (LLN) and the Central Limit Theorem (CLT) hold.
+
+\begin{as}[Weak dependence for LLN]
+\label{as:LLN}
+$\sum_{s=0}^{n} M_n^{\partial}(s) \tilde{\theta}_{n, s} = o(n)$, where $M_n^{\partial}(s) = \frac{1}{n} \sum_{i=1}^n |N^{\partial}(i; s)|$ and $N^{\partial}(i; s)$ is as defined in Section 2.
+\end{as}
+
+\begin{as}[Weak dependence for CLT]
+\label{as:CLT}
+A stronger technical condition on the network structure and dependence decay rate is required for the CLT. There exists a positive sequence $r_n \to \infty$ such that for some $p > 4$ and $k=1,2$:
+$$
+\frac{1}{\sigma_n^{2+k}} \sum_{i \in I_n} \sum_{s=0}^{\infty} s^{d-1} \max_{j \in I_n, s \leq l_A(i, j) < s+1} |N(i; r_n)^+ \setminus N(j; s-1)^+|^k \tilde{\theta}_{n, s}^{1-\frac{2+k}{p}} \to 0
+$$
+and
+$$
+\frac{|I_n|^2 \tilde{\theta}_{n, r_n}^{1-\frac{1}{p}}}{\sigma_n} \to 0 \quad \text{as } n \to \infty
+$$
+where $\sigma_n^2$ is the variance of the sum of the random variables.
+\end{as}
+
+\noindent
+Finally, we include the assumptions required for the consistency of the HAC variance estimator, based on Proposition 4.1 in \citet{Kojevnikov2021}.
+
+\begin{as}[Conditions for HAC consistency]
+\label{as:HAC}
+There exists some $p > 4$ such that the following conditions on the kernel $\omega(\cdot)$, the bandwidth $b_n$, and the weak dependence coefficients $\tilde{\theta}_{n, s}$ are satisfied:
+\begin{itemize}
+\item 
+$\omega(0)=1, \omega(s/b_n)=0 \text { for any } s>b_n$ and $\left|\omega(s/b_n)\right|<\infty$ for all $n$.
+\item 
+$\lim_{n \rightarrow \infty} \sum_{s \geq 1}\left|\omega\left(s/b_n\right)-1\right| s^{d-1} \theta_{n, s}^{1-\frac{2}{p}}=0$.
+\item $\lim_{n \rightarrow \infty} n^{-1}\sum_{s=0}^{\infty} s^{d-1} \max _{j \in I_n, s \leq l_A(i, j)<s+1}\left|N\left(i ; b_n \right)^+ \setminus N(j ; s-1)^+\right|^2 \theta_{n, s}^{1- \frac{4}{p}}=0$.
+\item 
+$\delta_n\left(b_n\right)=o(n)$ almost surely, where $\delta_n(b_n) = \sum_{s=0}^{b_n} M_n^{\partial}(s)$ and $M_n^{\partial}(s) = \frac{1}{n} \sum_{i=1}^n |N^{\partial}(i; s)|$ is the average number of units at exactly distance $s$ from each unit. This condition ensures that the network density within the bandwidth $b_n$ does not grow too fast relative to the sample size, which is necessary for the consistency of the HAC estimator.
+\item
+The sequence $\left\{\tilde{\theta}_{n, s} / s^{p /\left(p-4\right)}\right\}$ is non-increasing in $s \geq 1$.
+\end{itemize}
+\end{as}
+
+
+\subsection{Main theorems}
+% 元のSection 3.4と4.2の定理を移動・統合
+
+First, we present lemmas showing that the components of our proposed estimators satisfy the definition of $\psi$-dependence. This is derived from the $\alpha$-mixing property of the underlying variables (Assumption \ref{as:alpha_mixing}) and local interference (Assumption \ref{as:local_interference}). The proofs are provided in the Appendix. Throughout this subsection, $\mathbf{1}\{\cdot\}$ denotes the indicator function: $\mathbf{1}\{A\} = 1$ if condition $A$ holds and $\mathbf{1}\{A\} = 0$ otherwise.
+
+\begin{lem}[$\psi$-dependence of ADTT and AITT summand]
+\label{lem:psi_ADTT}
+% 仮定の参照を修正
+Under Assumptions \ref{as:local_interference}-\ref{as:alpha_mixing}, the collection of random variables $\{ \phi_i^{\mathrm{dir}} \}_{i \in I_n}$ and $\{ \phi_i^{\mathrm{ind}} \}_{i \in I_n}$ defined in (\ref{eq:Z}) are $\psi$-dependent with $\tilde{\theta}_{n, s} = \mathbf{1}\{s < 2K\} + \mathbf{1}\{s \geq 2K\} \widehat{\alpha}(s-2K)$ and $\tilde{\theta}_{n, s} = \mathbf{1}\{s < 4K\} + \mathbf{1}\{s \geq 4K\} \widehat{\alpha}(s-4K)$, respectively. 
+\end{lem}
+
+
+% I.1. 章構成の再編 (Lemma 2の証明をAppendixへ移動)
+
+This lemma ensures that our estimators can be analyzed within the $\psi$-dependence framework. By applying the limit theorems from \citet{Kojevnikov2021}, we obtain consistency and asymptotic normality.
+
+
+\begin{thm}[Consistency]
+\label{thm:consistency_ADTT}
+% 仮定の参照を修正
+Under Assumptions \ref{as:trend} and \ref{as:local_interference}-\ref{as:LLN}, $\widehat{\tau}_{\mathrm{dir}}$ and $\widehat{\tau}_{\mathrm{ind}}$ are consistent under $n\to\infty$. 
+\end{thm}
+
+%\begin{proof}
+%The proof is provided in the Appendix.
+%\end{proof}
+
+%\begin{thm}[Consistency of $\widehat{{\rm AITT}}$]
+%\label{thm:consistency_AITT}
+%% 仮定の参照を修正
+%Under Assumptions \ref{as:trend} and \ref{as:local_interference}-\ref{as:LLN}, $\widehat{{\rm AITT}}$ is consistent for AITT.
+%$$ \widehat{{\rm AITT}} \xrightarrow{a.s.} {\rm AITT} \quad \text{as } n \to \infty $$
+%\end{thm}
+%\begin{proof}
+%The proof is provided in the Appendix.
+%\end{proof}
+
+
+\begin{thm}[Asymptotic normality]
+\label{thm:normality_ADTT}
+% 仮定の参照を修正
+Under Assumptions \ref{as:trend}, \ref{as:local_interference}-\ref{as:alpha_mixing}, and \ref{as:CLT}, it holds that $\sqrt{n}(\widehat{\tau}_{\mathrm{dir}}-\tau_{\mathrm{dir}})/\sigma_{n,D} \to N(0, 1)$ and $\sqrt{n}(\widehat{\tau}_{\mathrm{ind}}-\tau_{\mathrm{ind}})/\sigma_{n,I} \to N(0, 1)$ as $n\to\infty$, where $\sigma_{n,D}^2={\rm Var}(n^{-1}\sum_{i \in I_n}\phi_i^{\mathrm{dir}})$ and $\sigma_{n,I}^2={\rm Var}(n^{-1}\sum_{i \in I_n}\phi_i^{\mathrm{ind}})$. 
+
+%$\widehat{{\rm ADTT}}$ and $\widehat{{\rm AITT}}$ are asymptotically normal. Let $S_n = \sum_{i \in I_n} \phi_i^{{\rm ADTT}}$, and let $\sigma_n^2 = \text{Var}(S_n)$. Then,
+%$$
+%\sup _{t \in \mathbf{R}}\left|\mathbf{P} \Bigg( \frac{S_n}{\sigma_n} \leq t \Bigg) -\Phi(t)\right| \rightarrow_{a . s .} 0 \quad \text{ as } n \rightarrow \infty
+%$$
+\end{thm}
+%\begin{proof}
+%The proof is provided in the Appendix.
+%\end{proof}
+
+%\begin{thm}[Asymptotic Normality of $\widehat{{\rm AITT}}$]
+%\label{thm:normality_AITT}
+% 仮定の参照を修正
+%Under Assumptions \ref{as:trend}, \ref{as:local_interference}-\ref{as:alpha_mixing}, and \ref{as:CLT}, $\widehat{{\rm AITT}}$ is also asymptotically normal.
+%\end{thm}
+%\begin{proof}
+%The proof is provided in the Appendix.
+%\end{proof}
+
+
+We next provide consistency of the HAC estimator introduced in Section~3.3. 
+
+\begin{thm}[Consistency of variance estimator]
+\label{thm:HAC}\
+
+% 仮定の参照を修正
+Under Assumptions \ref{as:trend}, \ref{as:local_interference}-\ref{as:alpha_mixing}, \ref{as:CLT} and \ref{as:HAC}, the HAC estimator $\widehat{V}_n$ given in (\ref{eq:HAC}) is consistent for the asymptotic variance. Specifically, for the ADTT estimator, $\widehat{V}_n \to \sigma_{n,D}^2$ as $n\to\infty$, and for the AITT estimator, $\widehat{V}_n \to \sigma_{n,I}^2$ as $n\to\infty$, where $\sigma_{n,D}^2$ and $\sigma_{n,I}^2$ are defined in Theorem \ref{thm:normality_ADTT}.
+\end{thm}
+%\begin{proof}
+%The proof is provided in the Appendix.
+%\end{proof}
+
+We now provide theoretical guarantees for the DR estimators. The first theorem establishes the double robustness property, which is the key advantage of DR estimators over IPW estimators.
+
+\begin{thm}[Double robustness of DR estimators]
+\label{thm:DR_robustness}
+Under Assumptions \ref{as:NoAnticipation} and \ref{as:trend}, the DR estimators $\widehat{\tau}_{\mathrm{dir}}^{DR}$ and $\widehat{\tau}_{\mathrm{ind}}^{DR}$ are consistent for $\tau_{\mathrm{dir}}$ and $\tau_{\mathrm{ind}}$, respectively, if either:
+\begin{itemize}
+\item the propensity score models ($e_i$, $e'_{ij}$) are correctly specified, or
+\item the outcome regression models ($\mu_{1i}$, $\mu_{0i}$, $\mu_{1ij}$, $\mu_{0ij}$) are correctly specified.
+\end{itemize}
+That is, the DR estimators remain consistent even when one of these model components is misspecified, as long as the other is correctly specified.
+\end{thm}
+
+\begin{thm}[Asymptotic normality of DR estimators]
+\label{thm:DR_normality}
+Under Assumptions \ref{as:trend}, \ref{as:local_interference}-\ref{as:alpha_mixing}, and \ref{as:CLT}, if both the propensity score models and the outcome regression models are correctly specified (or estimated using machine learning methods with sufficient convergence rates), then $\sqrt{n}(\widehat{\tau}_{\mathrm{dir}}^{DR}-\tau_{\mathrm{dir}})/\sigma_{n,D}^{DR} \to N(0, 1)$ and $\sqrt{n}(\widehat{\tau}_{\mathrm{ind}}^{DR}-\tau_{\mathrm{ind}})/\sigma_{n,I}^{DR} \to N(0, 1)$ as $n\to\infty$, where $\sigma_{n,D}^{DR,2}={\rm Var}(n^{-1}\sum_{i \in I_n}\phi_i^{DR,\mathrm{dir}})$ and $\sigma_{n,I}^{DR,2}={\rm Var}(n^{-1}\sum_{i \in I_n}\phi_i^{DR,\mathrm{ind}})$ with $\phi_i^{DR,\mathrm{dir}}$ and $\phi_i^{DR,\mathrm{ind}}$ defined in equation (\ref{eq:Z_DR}).
+\end{thm}
+
+All the proofs of the above theorems are provided in the Appendix. 
+The above theorems provide theoretical guarantees of the statistical inference on ADTT and AITT by using the HAC estimator $\widehat{V}_n$. 
+
+
+%----------------------------------------%
+%           Experiments                  %
+%----------------------------------------%
+\section{Simulation Study}
+
+%This section presents comprehensive empirical evidence for our proposed method through both simulation studies and a real data application. We first evaluate the finite-sample performance of our estimators through Monte Carlo simulations, demonstrating robustness when the exposure mapping is unknown. We then apply our method to evaluate China's Special Economic Zone (SEZ) policy, illustrating the practical importance of accounting for spillover effects in policy evaluation.
+
+%\subsection{Simulation Study}
+
+This subsection evaluates the finite-sample performance of our proposed estimators (ADTT and AITT) through a series of Monte Carlo simulations. The primary goal is to demonstrate the robustness of our identification-based approach in settings where the true exposure mapping is unknown and potentially complex, comparing it against existing methods that rely on pre-specified structures.
+
+
+\subsection{Data generating process}
+
+We simulate a population of $n$ units randomly located in a $20 \times 20$ two-dimensional space. The network structure is defined by the Chebyshev distance with the interference range set to $K=1$.
+We generate two types of confounder: an observed individual attribute $z_i \sim N(0,1)$, and an unobserved dependent factor, $(z_{u1},\ldots,z_{un}) \sim N(0, \Sigma)$, where the covariance matrix $\Sigma_{ij} = 0.5^{l_A(i, j)}$ captures the network dependence that decays with the distance of the network $l_A(i, j)$. 
+Then, the treatment is assigned based on both factors as 
+$$
+P(D_i=1 \mid z_i, z_{u,i}) = \text{logit}^{-1}(0.3 z_i + 0.8 z_{u,i}),
+$$
+which generates a network-dependent clustered treatment pattern.
+The outcomes are generated according to the following two-period model:
+\begin{align*}
+Y_{1i} &= 1.2 z_i + 0.5 z_{u,i} + \epsilon_{1i} \\
+Y_{2i} &= 1 + Y_{1i} + \tau D_i + f(S_i) + 0.1 z_{u,i} + 0.2 z_i + \epsilon_{2i}
+\end{align*}
+where $\epsilon_{1i}, \epsilon_{2i} \sim N(0, 1)$. The true direct treatment effect is set to $\tau = 0.8$.
+The core feature of this simulation is the spillover function $f(S_i)$, where $S_i$ is the number of treated neighbors of unit $i$. We assume a complex, step-wise increasing structure:
+$$
+f(S_i)=0.8 \cdot I(S_i=1) + 1.6\cdot I(S_i=2) + 2.4 \cdot I(S_i\geq 3).
+$$
+This represents a non-linear interference structure where the spillover effect saturates. Crucially, we assume that this functional form $f(\cdot)$ is unknown to the researcher.
+While the true ADTT is equal to $\tau=0.8$, the true AITT is calculated as the conditional average over the generated data. Specifically, for each treated unit $i$, we compute the average spillover effect on its neighbors $j$ by comparing the outcomes when unit $i$ is treated versus not treated, conditional on the observed network structure and treatment assignments. The true AITT calculated on the basis of the DGP, averaged across simulation runs, is approximately 0.4961. 
+Figure \ref{fig:spillover_structure} shows the distribution of $S_i$ in a representative simulation run, indicating the prevalence of different levels of exposure.
+
+
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth]{results/spillover_structure_r.png}
+% I.3. 表記の統一 (Spillover Effect)
+\caption{Distribution of the number of treated neighbors ($S_i$) across units in a representative simulation run. This histogram shows the prevalence of different exposure levels, which is crucial for understanding the distribution of spillover effects in our data generating process.}
+\label{fig:spillover_structure}
+\end{figure}
+
+
+
+
+\subsection{Comparative methods}
+
+We first evaluate the performance of the estimation of the direct effect of the treatment, obtained by the proposed estimators (which rely on nonparametric identification) together with several existing methods. 
+For the proposed estimators, propensity scores are estimated conditioning on the observed covariates $z_i$ and the neighborhood treatment vector $\bD_{N_i}$ (for ADTT) or $\bD_{N_j}^{-i}$ (for AITT), as specified in Theorems \ref{thm:identification_ADTT} and \ref{thm:identification_AITT}. 
+
+As described in Section 3.1, we specify the propensity score models using logistic regression. Specifically, for ADTT, we estimate $e_i(z_i) = P(D_i = 1 | \bD_{N_i}, z_i)$ using the model $\text{logit}(P(D_i=1)) = \alpha + \beta^\top z_i + \sum_{k=1}^L \gamma_k D_{(k)}$, where $D_{(k)}$ denotes the treatment indicator of the $k$-th nearest neighbor in $N_i$. For AITT, we similarly estimate $e'_{ij}(z_i, z_j) = P(D_i = 1 | D_j, \bD_{N_j}^{-i}, z_i, z_j)$ using logistic regression conditioning on $D_j$, the treatment vector $\bD_{N_j}^{-i}$ (sorted by distance), and the covariates $z_i$ and $z_j$. In our simulation experiments, we set $L = 10$. For AITT estimation, when the number of neighbors for unit $j$ exceeds $L$, we randomly sample $L$ neighbors from those within distance $K$ to maintain computational efficiency while avoiding arbitrary selection. This preserves the distance-based neighborhood definition (all neighbors are within distance $K$) while ensuring that the selection among eligible neighbors is not dependent on data ordering.
+
+All other estimators use only the observed covariates $z_i$.
+In this simulation, we report results for both the IPW and DR versions of our proposed estimators. The IPW estimators rely solely on propensity score models, while the DR estimators combine IPW with outcome regression models, providing double robustness against model misspecification.
+
+For the DR estimators, we estimate the outcome regression models using linear regression (ordinary least squares, OLS) as described in Section 3.2. In our simulation study, the observed covariate $z_i$ is a one-dimensional standard normal random variable ($z_i \sim N(0,1)$), as specified in the data generating process. For ADTT, the outcome regression model uses the feature vector $X_i^{\mathrm{ADTT,outcome}} = [D_i, z_i, D_{(1)}, D_{(2)}, \ldots, D_{(L)}]$, where $D_i$ is the treatment indicator for unit $i$, $z_i$ is the observed covariate, and $D_{(k)}$ are the treatment indicators of unit $i$'s neighbors sorted by distance. The model is fitted to predict $\Delta Y_i = Y_{2i} - Y_{1i}$ using all available data. To obtain predictions for $\mu_{1i}$ and $\mu_{0i}$, we set $D_i = 1$ and $D_i = 0$ respectively while keeping all other features fixed at their observed values. For AITT, the outcome regression model uses the feature vector $X_{ij}^{\mathrm{AITT,outcome}} = [D_i, D_j, z_i, z_j, D_{(1)}^{-i}, D_{(2)}^{-i}, \ldots, D_{(L)}^{-i}]$, where $D_i$ and $D_j$ are the treatment indicators for units $i$ and $j$, $z_i$ and $z_j$ are their respective covariates, and $D_{(k)}^{-i}$ are the treatment indicators of unit $j$'s neighbors (excluding unit $i$) sorted by distance. The model is fitted to predict $\Delta Y_j = Y_{2j} - Y_{1j}$ using all available $(i,j)$ pairs, and predictions for $\mu_{1ij}$ and $\mu_{0ij}$ are obtained by setting $D_i = 1$ and $D_i = 0$ respectively.
+
+%We run $M=100$ simulations for the main analysis.
+
+\begin{itemize}
+% 定理の参照を修正
+\item 
+\textbf{Proposed IPW}: Our proposed nonparametric IPW estimators for ADTT and AITT. Propensity scores are estimated using a logistic regression model conditioning on the neighborhood treatment vector.
+\item
+\textbf{Proposed DR}: Our proposed nonparametric DR estimators for ADTT and AITT. These combine IPW with outcome regression models, providing consistency if either the propensity score model or the outcome regression model is correctly specified.
+
+\item
+\textbf{Xu (2025) methods}: The estimators proposed by \citet{Xu2025}, which require specifying an exposure mapping $G_i$. We implement both the IPW and DR versions of these estimators. The following three exposure mappings are used:
+\begin{itemize}
+\item 
+Oracle (Infeasible): The researcher knows the true 4-level structure. $G_i^{\text{Oracle}} = \min(S_i, 3)$.
+\item 
+MO (Misspecified Ordering): The structure is misspecified; 30\% of units are randomly assigned to a different exposure group based on $G_i^{CS}$.
+\item 
+FM (Fully Misspecified): The researcher assumes an overly simplified binary structure. $G_i^{FM} = \mathbb{I}(S_i > 1)$.
+\end{itemize}
+Note that in Table \ref{tab:main_results_adtt}, we report only the DR versions (denoted as Xu (Oracle), Xu (MO), and Xu (FM)) for comparison with our proposed DR estimator. Figure \ref{fig:estimator_distribution} includes both IPW and DR versions of Xu's methods.
+
+\item 
+\textbf{Standard DID methods}: Standard DID estimators that ignore interference (canonical IPW, canonical TWFE, DR-DID) and an extended TWFE model (Modified TWFE in \cite{Xu2025}) that accounts for simple binary exposure ($I(S_i \geq 1)$).
+\end{itemize}
+
+
+
+%
+\subsection{Results}
+Table \ref{tab:main_results_adtt} and Figure \ref{fig:estimator_distribution} summarize the results for ADTT ($\tau_{\mathrm{dir}} = 0.8$). Benchmark estimators ignoring interference (Canonical IPW, TWFE, DR-DID) exhibit substantial upward bias (Bias $\approx 0.21$) due to positive spillovers from clustered treatments. The Modified TWFE also fails to capture the stepwise structure.
+Methods from \citet{Xu2025} are sensitive to specification; while the Oracle estimator performs well, misspecified versions (MO, FM) show significant bias.
+In contrast, our proposed estimators are robust. The IPW and DR ADTT estimators achieve low bias (0.063 and 0.033, respectively) and RMSE, comparable to the infeasible Oracle estimator. This confirms that our identification-based approach effectively accounts for complex interference without prior knowledge of the structure.
+
+\begin{table}[h]
+\centering
+\label{tab:main_results_adtt}
+\begin{tabular}{lrrr}
+\hline
+Estimator & Bias & RMSE & CP \\
+\hline
+\multicolumn{4}{l}{\textit{Proposed Methods}} \\
+\textbf{Proposed IPW (ADTT)} & \textbf{0.0631} & \textbf{0.1201} & \textbf{1.0000} \\
+\textbf{Proposed DR (ADTT)} & \textbf{0.0332} & \textbf{0.1052} & \textbf{0.9300} \\
+\hline
+\multicolumn{4}{l}{\textit{Xu (2025) Methods}} \\
+Xu (Oracle) & 0.0567 & 0.1064 & 0.9900 \\
+Xu (MO) & 0.1358 & 0.1827 & 0.9400 \\
+Xu (FM) & 0.1032 & 0.1411 & 0.9900 \\
+\hline
+\multicolumn{4}{l}{\textit{Standard DID Methods}} \\
+Canonical IPW & 0.2115 & 0.2621 & 0.5200 \\
+Canonical TWFE & 0.2077 & 0.2591 & 0.5100 \\
+DR-DID & 0.2100 & 0.2613 & 0.5200 \\
+Modified TWFE & 0.1484 & 0.1936 & 0.7000 \\
+\hline
+\end{tabular}
+\caption{Simulation Results for ADTT: Performance comparison of estimators under $n=500$ based on 100 Monte Carlo replications.
+Bias, RMSE, and Coverage Probability (CP) at 95\% confidence level are reported for each estimator. CP measures the proportion of simulation replications where the 95\% confidence interval contains the true parameter value. Proposed IPW (ADTT) and Proposed DR (ADTT) denote our inverse probability weighted and doubly robust estimators for ADTT (based on nonparametric identification), respectively. Xu (Oracle), Xu (MO), and Xu (FM) refer to the doubly robust estimators from \citet{Xu2025} with oracle (infeasible), misspecified ordering, and fully misspecified exposure mappings, respectively. Canonical IPW, Canonical TWFE, and DR-DID are standard DID methods that ignore interference. Modified TWFE accounts for simple binary exposure. The true ADTT is 0.8.
+}
+\end{table}
+
+\begin{table}[h]
+\centering
+\label{tab:main_results_aitt}
+\begin{tabular}{lrrr}
+\hline
+Estimator & Bias & RMSE & CP \\
+\hline
+\multicolumn{4}{l}{\textit{Proposed Methods}} \\
+\textbf{Proposed IPW (AITT)} & \textbf{0.0470} & \textbf{0.1233} & \textbf{1.0000} \\
+\textbf{Proposed DR (AITT)} & \textbf{0.0137} & \textbf{0.0575} & \textbf{0.9300} \\
+\hline
+\end{tabular}
+\caption{Simulation Results for AITT: Performance comparison of estimators under $n=500$ based on 100 Monte Carlo replications.
+Bias, RMSE, and Coverage Probability (CP) at 95\% confidence level are reported for each estimator. CP measures the proportion of simulation replications where the 95\% confidence interval contains the true parameter value. Proposed IPW (AITT) and Proposed DR (AITT) denote our inverse probability weighted and doubly robust estimators for AITT (based on nonparametric identification), respectively. The true AITT is 0.4961.
+}
+\end{table}
+
+
+The proposed AITT estimators also perform well. The IPW AITT estimator achieves a bias of 0.0470 and RMSE of 0.1233, while the DR AITT estimator shows superior performance with bias 0.0137 and RMSE 0.0575. Both are comparable to or better than the corresponding ADTT estimators' performance. This demonstrates that our identification-based approach can effectively identify indirect effects without requiring a pre-specified exposure mapping. The AITT estimators' performance is particularly noteworthy given that they require conditioning on a more complex set of neighborhood configurations than ADTT, involving both unit $i$'s and unit $j$'s neighborhoods. The fact that AITT achieves similar or better performance than ADTT suggests that the curse of dimensionality, while a theoretical concern, does not substantially degrade performance in our simulation setting with moderate neighborhood sizes. The DR AITT estimator's superior performance further demonstrates the benefit of double robustness for indirect effect estimation.
+
+
+\begin{figure}[h]
+\centering
+% 1枚目 (幅を0.45程度にする)
+\includegraphics[height=7cm]{results/estimator_distribution_adtt_xu_r.png}
+% 間にスペースを入れる (hfillを入れると左右に均等配置されます)
+% 2枚目
+\includegraphics[height=7cm]{results/estimator_distribution_aitt_r.png}
+
+\caption{Distribution of estimated treatment effects across Monte Carlo replications. Left panel shows ADTT estimates comparing the proposed IPW and DR methods with Xu (2025) IPW and DR estimators under different exposure mapping specifications (Oracle, MO, FM). Note that standard DID methods (Canonical IPW, Canonical TWFE, DR-DID, Modified TWFE) are not included in this figure but are reported in Table \ref{tab:main_results_adtt}. Right panel shows AITT estimates for the proposed IPW and DR methods. The true values are indicated by horizontal dashed lines (ADTT = 0.8, AITT = 0.4961).}
+\label{fig:estimator_distribution}
+\end{figure}
+
+%\subsection{Impact of sample size}
+
+We also examine the asymptotic properties of the estimators by varying the sample size $n \in \{300, 500, 700\}$. 
+Figure~\ref{fig:robustness_sample_size_bias} shows the Bias as a function of $n$.
+As expected, the performance of the proposed IPW and DR ADTT estimators improves as the sample size increases, with both Bias and RMSE decreasing towards zero. This provides empirical evidence for the consistency of our estimators (Theorem \ref{thm:consistency_ADTT}). In contrast, the estimators that ignore interference or rely on misspecified exposure mappings retain substantial bias even with larger sample sizes, indicating their inconsistency under this DGP.
+
+
+%
+\begin{figure}[h]
+\includegraphics[width=1.0\linewidth]{results/robustness_bias_vs_sample_size_r.png}
+\caption{Bias of the proposed IPW and DR ADTT estimators and benchmark methods as a function of sample size $N \in \{300, 500, 700\}$. The proposed IPW and DR methods show decreasing bias with increasing sample size, providing empirical evidence for consistency. Benchmark methods that ignore interference or rely on misspecified exposure mappings retain substantial bias even with larger sample sizes.}
+\label{fig:robustness_sample_size_bias}
+\end{figure}
+
+
+
+
+
+\subsection{Robustness checks}
+
+We conduct additional robustness checks to examine how our proposed method performs under different network structures and dependence patterns. These experiments provide further evidence of the robustness of our nonparametric approach.
+
+
+%
+To check the effect of network dependence, we vary the strength of spatial correlation in the unobserved confounder by changing the base correlation parameter $\rho_0 \in \{0.2, 0.5, 0.8\}$. Stronger spatial correlation increases the dependence between neighboring units, making it more challenging to identify causal effects. Figure~\ref{fig:robustness_correlation_bias} demonstrates that our proposed method remains robust across different levels of spatial correlation, while benchmark methods that ignore interference show deteriorating performance as correlation increases.
+
+\begin{figure}[h]
+\includegraphics[width=1.0\linewidth]{results/robustness_bias_vs_correlation_r.png}
+\caption{Bias of the proposed IPW and DR ADTT estimators and benchmark methods as a function of spatial correlation strength ($\rho_0 \in \{0.2, 0.5, 0.8\}$) in the unobserved confounder. Stronger spatial correlation increases dependence between neighboring units, making causal identification more challenging. The proposed IPW and DR methods remain robust across different correlation levels, while benchmark methods show deteriorating performance as correlation increases.}
+\label{fig:robustness_correlation_bias}
+\end{figure}
+
+
+%\paragraph{Sensitivity of neighborhood size}
+Next, we investigate sensitivity of neighborhood size of the proposed method.
+A potential concern with our approach is the curse of dimensionality when neighborhood sizes are large. To examine this, we conduct a sensitivity analysis where we vary the number of neighborhood features used in the propensity score estimation. Figure \ref{fig:sensitivity_features_bias} shows that while the IPW estimator's performance degrades slightly as the effective dimensionality increases, the DR estimator maintains stable or even improved performance, demonstrating the robustness of the doubly robust approach against the curse of dimensionality. Both methods maintain reasonable performance even with larger neighborhoods, demonstrating the practical feasibility of our approach.
+
+\begin{figure}[h]
+\includegraphics[width=1.0\linewidth]{results/sensitivity_bias_vs_features_r.png}
+\caption{Sensitivity analysis showing bias of the proposed IPW and DR ADTT estimators as a function of the number of neighborhood features used in propensity score estimation. This examines the curse of dimensionality concern when neighborhood sizes are large. While the IPW estimator's performance degrades slightly as effective dimensionality increases, the DR estimator maintains stable or improved performance, demonstrating the robustness of the doubly robust approach. Both methods maintain reasonable performance even with larger neighborhoods, demonstrating practical feasibility.}
+\label{fig:sensitivity_features_bias}
+\end{figure}
+
+
+
+
+
+%----------------------------------------%
+%             Application                %
+%----------------------------------------%
+\section{Real Data Application: SEZ Policy in China}
+
+We apply our method to evaluate the effects of China's Special Economic Zone (SEZ) policy, a prominent place-based policy intervention. This application demonstrates the practical importance of accounting for spillover effects in policy evaluation and illustrates how our identification-based approach can be applied in real-world settings where the interference structure is unknown.
+
+
+%
+We use data from \citet{Xu2025}, which contains village-level information from China for 2004 (pre-treatment) and 2008 (post-treatment). The analysis covers approximately 60,000 villages, of which about 4,000 were designated as SEZs between 2005 and 2008, with a focus on provincial-level SEZs established in 2006. The treatment variable $D_i$ indicates whether village $i$ was designated as an SEZ.
+Since detailed geographic coordinates are not available in the data, we define neighborhoods at the county level. Specifically, for each village $i$, we consider all other villages in the same county as its neighbors. As in the simulation study, we use fixed-length neighborhood treatment vectors with $L = 10$ to avoid the curse of dimensionality. When the number of neighbors exceeds $L$, to avoid arbitrary selection based on data ordering, we randomly sample $L$ neighbors from the same county to construct the neighborhood set. The exposure mapping is constructed using a leave-one-out (LOO) SEZ ratio: for each village $i$, we calculate the proportion of other villages in the same county that were designated as SEZs. Villages are then classified as having high exposure ($G_i=1$) if their LOO SEZ ratio exceeds the sample mean, and low exposure ($G_i=0$) otherwise.
+
+We analyze three outcome variables, all measured in log scale: capital ($k$), employment ($l$), and output ($y$). These represent key economic indicators that capture the impact of SEZ policy on local economic development. 
+
+For the propensity score models, we use the same covariates as \citet{Xu2025}. Specifically, the feature vector $z_i$ consists of eight variables: four basic covariates and their county-level leave-one-out (LOO) averages. The basic covariates are: distance to airport (\texttt{airport\_p}), distance to port (\texttt{port\_p}), capital-labor ratio (\texttt{kl\_p}), and number of firms (\texttt{num\_p}). The county-level LOO averages are computed as the mean of each basic covariate across all other villages in the same county, excluding village $i$ itself. These are denoted as \texttt{airport\_p\_county\_mean}, \texttt{port\_p\_county\_mean}, \texttt{kl\_p\_county\_mean}, and \texttt{num\_p\_county\_mean}. 
+
+For the outcome regression models (used in the DR estimators), we use a different set of features. The feature vector consists of the four basic covariates listed above (\texttt{airport\_p}, \texttt{port\_p}, \texttt{kl\_p}, \texttt{num\_p}) plus interaction terms between the treatment indicator $D_i$ and each of these four covariates, resulting in a total of nine features (four basic covariates plus four interaction terms, plus the treatment indicator $D_i$ itself). This specification allows the model to capture heterogeneous treatment effects that may vary with the baseline characteristics of the villages.
+
+We compare our proposed estimators (based on nonparametric identification) with several benchmarks. For our proposed method, we use the IPW estimators, estimating propensity scores using logistic regression, conditioning directly on the neighborhood treatment vector as specified in Theorems \ref{thm:identification_ADTT} and \ref{thm:identification_AITT}. As in the simulation study, we use fixed-length neighborhood treatment vectors with $L = 10$ to avoid the curse of dimensionality. For AITT estimation, when the number of neighbors exceeds $L$, we randomly sample $L$ neighbors from the same county to avoid arbitrary selection based on data ordering. We also implement the methods from \citet{Xu2025}, which require specifying an exposure mapping, and standard DID estimators that ignore interference (Canonical IPW and Canonical DR-DID).
+To take account for within-county correlation in the error terms, standard errors for the proposed ADTT and AITT estimators are computed using a HAC estimator that accounts for spatial correlation within each county. Specifically, we compute the HAC standard errors separately for each county, accounting for the correlation structure within counties while assuming independence across counties. This approach is computationally efficient and accounts for the within-county clustering of villages. 
+
+
+
+%
+Table~\ref{tab:sez_results} presents the results. First, consistent with \citet{Xu2025}, SEZ policy shows positive direct effects, with larger impacts on villages with low exposure to other SEZs.
+Second, we find negative spillover effects among treated villages, suggesting competition or congestion effects, while spillovers on control villages are negligible.
+Third, Canonical DID estimates are substantially larger than estimates accounting for spillovers (Proposed IPW and ODE), indicating positive selection bias. Our proposed ADTT estimates are larger than the ODE estimates, likely because ADTT averages over the treated subpopulation conditional on the full neighborhood configuration. The AITT results further highlight the negative externalities imposed by treated units.
+
+
+%
+\begin{table}[h]
+\centering
+\caption{Estimated direct and spillover effects of SEZ Policy.
+Standard errors in parentheses for the proposed IPW ADTT and IPW AITT estimators are computed using a HAC estimator that accounts for within-county spatial correlation. 
+All outcomes are in log scale. ADTT = Average Direct Treatment Effect on the Treated. AITT = Average Indirect Treatment Effect on the Treated. ODE = Overall Direct Effect. Spillover effects are defined as in \citet{Xu2025}.
+}
+\label{tab:sez_results}
+\begin{tabular}{lccc}
+\hline
+& \multicolumn{3}{c}{Outcome Variable} \\
+\cline{2-4}
+Effect & Capital (log) & Employment (log) & Output (log) \\
+\hline
+\multicolumn{4}{l}{\textit{Direct Effects by Exposure Level}} \\
+ADTT (Low Exposure) & 0.0356 & 0.0309 & 0.0362 \\
+ADTT (High Exposure) & 0.0237 & 0.0197 & 0.0245 \\
+\hline
+\multicolumn{4}{l}{\textit{Average Direct Effect (ODE)}} \\
+ODE (DR) & 0.0283 & 0.0240 & 0.0290 \\
+\textbf{Proposed IPW (ADTT)} & \textbf{0.2745} & \textbf{0.2882} & \textbf{0.2571} \\
+& \textbf{(0.0229)} & \textbf{(0.0161)} & \textbf{(0.0246)} \\
+Canonical DID & 0.3552 & 0.3464 & 0.3582 \\
+\hline
+\multicolumn{4}{l}{\textit{Indirect Effects}} \\
+\textbf{Proposed IPW (AITT)} & \textbf{-0.1502} & \textbf{-0.0387} & \textbf{-0.1522} \\
+& \textbf{(0.0096)} & \textbf{(0.0070)} & \textbf{(0.0117)} \\
+\hline
+\multicolumn{4}{l}{\textit{Spillover Effects}} \\
+Spillover (Treated) & -0.1930 & -0.1438 & -0.1955 \\
+Spillover (Control) & -0.0027 & 0.0328 & -0.0023 \\
+\hline
+\end{tabular}
+\smallskip
+\footnotesize
+\end{table}
+
+
+
+%---------------------------------------------%
+%              Discussion                     %  
+%---------------------------------------------%
+\section{Concluding Remarks}
+
+% I.3. 表記の統一 (Difference-in-Differences)
+This paper proposed a novel framework for Difference-in-Differences (DID) analysis under local network interference, without relying on the restrictive assumption of a known exposure mapping. We introduced a nonparametric identification strategy based on a conditional parallel trends assumption given the neighborhood treatment configuration. We also proposed a new estimand for the indirect effect (AITT) that directly captures the externality of the intervention. We established the asymptotic properties of the proposed IPW estimators using the theory of weakly dependent random fields and provided a consistent variance estimator for robust inference.
+
+Our simulation studies demonstrated the robustness of our identification-based approach (nonparametric in identification) in settings with complex and unknown interference structures, outperforming methods that rely on misspecified exposure mappings or ignore interference altogether. The real data application to China's SEZ policy further illustrated the practical importance of accounting for spillover effects, revealing substantial policy effects and important heterogeneity patterns that would be missed by standard methods.
+
+Future research directions include extending this framework to settings with staggered treatment adoption, which would combine the challenges addressed in this paper with those recently highlighted in the DID literature. Another important extension is the development of methods for estimating the propensity scores nonparametrically when the neighborhood size is large, potentially leveraging machine learning techniques to address the curse of dimensionality inherent in our robust approach.
+
+
+
+\section*{Acknowledgement}
+% I.3. 表記の統一 (Japan Society for the Promotion of Science)
+This work is supported by the Japan Society for the Promotion of Science (JSPS KAKENHI) grant numbers, 24K00244 and 25H00546. 
+
+
+
+%----------------------------------------%
+%            Reference                   %
+%----------------------------------------%
+\vspace{0.5cm}
+%  Reference
+\bibliographystyle{chicago}
+\bibliography{ref.bib}
+
+
+
+
+\newpage
+%----------------------------------------%
+%              Appendix                  %
+%----------------------------------------%
+\appendix 
+\begin{center}
+{\bf {\large Appendix}}
+\end{center}
+
+\section{Proofs of Main Theorems}
+
+% I.1. 章構成の再編 (証明の移動・整理)
+
+\subsection{Proofs of Identification Theorems (Section 2)}
+
+\begin{proof}[Proof of Theorem \ref{thm:identification_ADTT}]
+By the definition of ADTT, we marginalize over all possible combinations of the neighborhood treatment vector $\boldsymbol{d} = \boldsymbol{d}_{N_i}$ for each unit $i$.
+\begin{align*}
+\tau_{\mathrm{dir}} &= \frac{1}{n} \sum_{i=1}^n E[ y_{2i} (1, \bD_{N_i}) - y_{2i} (0, \bD_{N_i}) | D_i = 1, z_i] \\
+&= \frac{1}{n} \sum_{i=1}^n \sum_{\boldsymbol{d}} E[ y_{2i} (1, \boldsymbol{d}) - y_{2i} (0, \boldsymbol{d}) | D_i = 1, \bD_{N_i} = \boldsymbol{d}, z_i] \\
+& \times P(\bD_{N_i} = \boldsymbol{d} | D_i = 1, z_i)
+\end{align*}
+The conditional expectation term can be rewritten as the difference in trends, 
+\begin{align*}
+& E[ y_{2i} (1, \boldsymbol{d}) - y_{2i} (0, \boldsymbol{d}) | D_i = 1, \bD_{N_i} = \boldsymbol{d}, z_i] \\
+& = E[ y_{2i} (1, \boldsymbol{d}) - y_{1i} | D_i = 1, \bD_{N_i} = \boldsymbol{d}, z_i] \\
+& - E[ y_{2i} (0, \boldsymbol{d}) - y_{1i} | D_i = 1, \bD_{N_i} = \boldsymbol{d}, z_i]
+\end{align*}
+% 仮定の参照を修正
+By Assumption \ref{as:trend}, the second term (the counterfactual trend) is identified by the observed trend in the control group ($D_i=0$):
+\begin{align*}
+E[ y_{2i} (0, \boldsymbol{d}) - y_{1i} | D_i = 1, \bD_{N_i} = \boldsymbol{d}, z_i] = E[ Y_{2i} - Y_{1i} | D_i = 0, \bD_{N_i} = \boldsymbol{d}, z_i]
+\end{align*}
+Let $\Delta_{i,d} = E[ Y_{2i} - Y_{1i} | D_i=1, \bD_{N_i}=\boldsymbol{d}, z_i] - E[ Y_{2i} - Y_{1i} | D_i=0, \bD_{N_i}=\boldsymbol{d}, z_i]$.
+% \pi_iを使用
+Also, by Bayes' theorem, 
+\begin{align*}
+P(\bD_{N_i} = \boldsymbol{d} | D_i = 1, z_i) 
+& =  \frac{P(D_i=1|\bD_{N_i}=\boldsymbol{d}, z_i)P(\bD_{N_i}=\boldsymbol{d}|z_i)}{P(D_i=1|z_i)} \\
+& = \frac{e_i(\boldsymbol{d}, z_i)P(\bD_{N_i}=\boldsymbol{d}|z_i)}{\pi_i(z_i)}   
+\end{align*}
+
+Thus, ADTT can be rewritten using an IPW-like form. Let $e_i = e_i(\bD_{N_i}, z_i)$.
+\begin{align*}
+\tau_{\mathrm{dir}} &= \frac{1}{n} \sum_{i=1}^n \sum_{\boldsymbol{d}} \Delta_{i,d} \frac{e_i(\boldsymbol{d}, z_i)P(\bD_{N_i}=\boldsymbol{d}|z_i)}{\pi_i(z_i)} \\
+&= \frac{1}{n} \sum_{i=1}^n E \left[ \left( E \left[ \left( \frac{D_i}{e_i} - \frac{1-D_i}{1-e_i} \right) (Y_{2i}-Y_{1i})|\bD_{N_i}, z_i\right] \right) \frac{e_i}{\pi_i} \middle| z_i \right] \\
+&= \frac{1}{n} \sum_{i=1}^n E \left[ E \left[ \frac{D_i-e_i}{e_i(1-e_i)}(Y_{2i}-Y_{1i}) \middle| \bD_{N_i}, z_i \right] \frac{e_i}{\pi_i} \middle| z_i \right] \\
+&= \frac{1}{n} \sum_{i=1}^n E \left[ \frac{D_i-e_i}{\pi_i(1-e_i)}(Y_{2i}-Y_{1i}) \middle| z_i \right]
+\end{align*}
+This completes the proof.
+\end{proof}
+
+
+
+
+\begin{proof}[Proof of Theorem \ref{thm:identification_AITT}]
+We consider the expectation term in the definition of AITT for a specific neighbor $j \in N_i$. Let $\bD^{d} = \bD_{N_j}^{(d)}$, $\bD^{-i} = \bD_{N_j}^{-i}$. We aim to identify:
+$$
+\tau_{ij} = E[ y_{2j} (D_j, \bD^{(1)}) - y_{2j} (D_j, \bD^{(0)}) | D_i = 1, z_i, z_j],
+$$
+where $\bD^{(d)}$ denotes the treatment vector of the neighbors of $j$ with $D_i=d\in \{0,1\}$.
+We marginalize over $D_j$ and $\bD^{-i}$.
+\begin{align*}
+\tau_{ij} = \sum_{d_j, \boldsymbol{d}^{-i}} & E[ y_{2j} (d_j, D_i=1, \boldsymbol{d}^{-i}) - y_{2j} (d_j, D_i=0, \boldsymbol{d}^{-i}) | D_i = 1, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j] \\
+& \times P(D_j = d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i} | D_i = 1, z_i, z_j).
+\end{align*}
+
+Let $\text{CATT}_{ij}(d_j, \boldsymbol{d}^{-i})$ denote the conditional expectation term. We rewrite it as the difference in trends:
+
+\begin{align*}
+\text{CATT}_{ij}(d_j, \boldsymbol{d}^{-i}) 
+& = E[ y_{2j} (d_j, D_i=1, \boldsymbol{d}^{-i}) - y_{1j} | D_i = 1, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j]\\
+& - E[ y_{2j} (d_j, D_i=0, \boldsymbol{d}^{-i}) - y_{1j} | D_i = 1, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j]
+\end{align*}
+
+% 仮定の参照を修正
+We apply Assumption \ref{as:trend} to unit $j$ to identify the counterfactual trend:
+\begin{align*}
+& E[ y_{2j} (d_j, D_i=0, \boldsymbol{d}^{-i}) - y_{1j} | D_i = 1, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j]\\
+& = E[ y_{2j} (d_j, D_i=0, \boldsymbol{d}^{-i}) - y_{1j} | D_i = 0, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j] \\
+&= E[ Y_{2j} - Y_{1j} | D_i = 0, D_j=d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i}, z_i, z_j].
+\end{align*}
+
+Thus, $\text{CATT}_{ij}(d_j, \boldsymbol{d}^{-i})$ is identified by the conditional DID for unit $j$'s outcome with respect to unit $i$'s treatment. Similar to Theorem \ref{thm:identification_ADTT}, this is expressed in IPW form using 
+
+$$e'_{ij}(d_j, \boldsymbol{d}^{-i}, z_i, z_j) = P(D_i=1 | D_j=d_j, \bD_{N_j}^{-i}=\boldsymbol{d}^{-i}, z_i, z_j)$$. 
+
+Letting $e'_{ij} = e'_{ij}(d_j, \boldsymbol{d}^{-i}, z_i, z_j)$, we have
+$$
+\text{CATT}_{ij}(d_j, \boldsymbol{d}^{-i}) = E \left[ \frac{D_i - e'_{ij}}{e'_{ij}(1-e'_{ij})} ( Y_{2j} - Y_{1j} ) \middle| D_j=d_j, \bD_{N_j}^{-i}=\boldsymbol{d}^{-i}, z_i, z_j \right].
+$$
+Now we substitute this back into $\tau_{ij}$. We use Bayes' theorem:
+% \pi_iを使用
+$$
+P(D_j = d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i} | D_i = 1, z_i, z_j) = \frac{e'_{ij} P(D_j = d_j, \bD_{N_j}^{-i} = \boldsymbol{d}^{-i} | z_i, z_j)}{P(D_i=1|z_i)}.
+$$
+\begin{align*}
+\tau_{ij} 
+&= E \left[ E \left[ \frac{D_i - e'_{ij}}{e'_{ij}(1-e'_{ij})} ( Y_{2j} - Y_{1j} ) \middle| D_j, \bD_{N_j}^{-i}, z_i, z_j \right] \times \frac{e'_{ij}}{\pi_i(z_i)} \middle| z_i, z_j \right] \\
+&= E \left[ \frac{D_i - e'_{ij}}{\pi_i(z_i)(1-e'_{ij})} ( Y_{2j} - Y_{1j} ) \middle| z_i, z_j \right].
+\end{align*}
+Finally, averaging over $j \in N_i$ and $i \in I_n$ yields the identification result for AITT.
+\end{proof}
+
+
+\subsection{Proofs of Asymptotic Theorems (Section 4)}
+
+% I.1. 本文中のLemma 1, 2の証明をここへ移動
+
+\begin{proof}[Proof of Lemma \ref{lem:psi_ADTT} (for ADTT)]
+% 仮定と変数の定義を参照・修正
+Let $\phi_i^{\mathrm{dir}} = \frac{D_i - e_i(\bD_{N_i}, z_i)}{\pi_i(z_i) (1-e_i(\bD_{N_i}, z_i))} ( Y_{2i} - Y_{1i} )$. We verify the definition of $\psi$-dependence.
+Consider any $h, h^{\prime} \in \mathbb{N}$, bounded Lipschitz functions $f \in \mathcal{L}_h, f^{\prime} \in \mathcal{L}_{h^{\prime}}$, and any pair of sets $(H, H^{\prime}) \in \mathcal{P}_n(h, h^{\prime} ; s)$ such that $l_A(H, H') \geq s > 0$.
+
+Case 1: $s \leq 2K$. By Assumptions \ref{as:overlap} (Overlap) and \ref{as:bounded_outcomes} (Bounded Outcomes), $\{\phi_i\}$ are uniformly bounded. Since $f$ and $f'$ are bounded, the covariance is bounded:
+$$
+|\operatorname{Cov}(f(\phi_H), f^\prime (\phi_{H^\prime}))| \leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty}.
+$$
+
+Case 2: $s > 2K$. Let $x_i = (Y_{1i}, D_i, \epsilon_i)$ be the fundamental variables. By Assumption \ref{as:local_interference} (Local Interference), $\phi_i$ is a measurable function of the variables in the $K$-neighborhood of $i$:
+$$
+\phi_i = g(\{ x_k \}_{k \in N(i; K)^+}).
+$$
+By Assumptions \ref{as:overlap} and \ref{as:bounded_outcomes}, $g$ is Lipschitz continuous.
+
+Let $H^K = \bigcup_{i \in H} N(i; K)^+$. Then, $\sigma(\{ \phi_i \}_{i \in H}) \subset \sigma(\{ x_i \}_{i \in H^K})$.
+When $s > 2K$, the distance between $H^K$ and $(H')^K$ is at least $s-2K$.
+
+Since $\{x_i\}$ is $\alpha$-mixing (Assumption \ref{as:alpha_mixing}), we apply Proposition 2.2 in \citet{Kojevnikov2021} to bound the covariance:
+\begin{align*}
+|\operatorname{Cov}(f(\phi_H), f^\prime (\phi_{H^{\prime}}))| &\leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \alpha(\sigma(\{x_i\}_{i \in H^K}), \sigma(\{x_i\}_{i \in (H')^K})) \\
+&\leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \bar{\alpha} (|H^K|, |(H')^K|, s - 2K).
+\end{align*}
+Using Assumption \ref{as:alpha_mixing}, $\bar{\alpha}(h, h', s) \leq \psi(h, h') \widehat{\alpha}(s)$. Assuming the neighborhood size $|N(i;K)^+|$ is bounded by $C_K$, we have $|H^K| \leq h C_K$.
+\begin{align*}
+|\operatorname{Cov}(f(\phi_H), f^\prime (\phi_{H^{\prime}}))| &\leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \psi(h C_K, h' C_K) \widehat{\alpha}(s-2K).
+\end{align*}
+
+Combining both cases, we define the coefficients. Let $\Psi(h, h') = \max \{1, \psi(h C_K, h' C_K) \}$. We set:
+$$
+\psi_{h, h^\prime} (f, f^\prime) = 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \Psi(h, h'),
+$$
+$$
+\tilde{\theta}_{n, s} = \mathbf{1} \{ s \leq 2K \} + \mathbf{1} \{ s > 2K \} \widehat{\alpha} (s-2K).
+$$
+This satisfies the definition of $\psi$-dependence.
+\end{proof}
+
+
+\begin{proof}[Proof of Lemma \ref{lem:psi_ADTT} (for AITT)]\
+
+% 仮定と変数の定義を参照・修正
+Let $\phi_i^{\mathrm{ind}} = \frac{1}{|N_i|} \sum_{j \in N_i} \left\{ \frac{D_i - e'_{ij}(z_i, z_j)}{\pi_i(z_i)(1-e'_{ij}(z_i, z_j))} (Y_{2j} - Y_{1j}) \right\}$,
+ and     $x_i = (Y_{1i}, D_i, \epsilon_i)$. The term $(Y_{2j}-Y_{1j})$ and $e'_{ij}$ depend on $\{x_k\}_{k \in N_j^+}$, where $N_j^+ = N_j \cup \{j\}$.
+By Assumption \ref{as:neighborhood_sufficiency}, $j \in N_i$ implies $l_A(i,j) \leq K$, and similarly for $k \in N_j^+$, we have $l_A(j,k) \leq K$ (since $N_j$ consists of the $L$ nearest neighbors of $j$). Therefore, the distance between $i$ and any $k \in N_j^+$ is at most $l_A(i,j)+l_A(j,k) \leq K+K = 2K$.
+Therefore, $\phi_i$ is a function of the variables in the $2K$-neighborhood of $i$:
+$$
+\phi_i = g(\{ x_k \}_{k \in N(i; 2K)^+}).
+$$
+By Assumptions \ref{as:overlap} and \ref{as:bounded_outcomes}, $g$ is Lipschitz continuous and bounded.
+
+Consider sets $H, H'$ such that $l_A(H, H') \geq s$.
+If $s \leq 4K$, the covariance is bounded by $4 \|f\|_{\infty} \|f^{\prime}\|_{\infty}$.
+
+If $s > 4K$, let $H^{2K} = \bigcup_{i \in H} N(i; 2K)^+$. The distance between $H^{2K}$ and $(H')^{2K}$ is at least $s-4K$.
+Applying Proposition 2.2 in \citet{Kojevnikov2021} and Assumption \ref{as:alpha_mixing}:
+\begin{align*}
+|\operatorname{Cov}(f(\phi_H), f^\prime (\phi_{H^{\prime}}))| &\leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \bar{\alpha} (|H^{2K}|, |(H')^{2K}|, s - 4K) \\
+&\leq 4 \|f\|_{\infty} \|f^{\prime}\|_{\infty} \psi(|H^{2K}|, |(H')^{2K}|) \widehat{\alpha}(s-4K).
+\end{align*}
+Assuming bounded neighborhood sizes, we can define the $\psi$-dependence coefficients similarly to Lemma \ref{lem:psi_ADTT}, with the decay rate:
+$$
+\tilde{\theta}_{n, s} = \mathbf{1} \{ s \leq 4K \} + \mathbf{1} \{ s > 4K \} \widehat{\alpha} (s-4K).
+$$
+This completes the proof.
+\end{proof}
+
+\begin{proof}[Proof of Theorem \ref{thm:consistency_ADTT} (Consistency)]
+The result follows directly from Theorem 3.1 in \citet{Kojevnikov2021}, given that the summand is $\psi$-dependent (Lemma \ref{lem:psi_ADTT}) and satisfies the weak dependence condition for the LLN (Assumption \ref{as:LLN}).
+\end{proof}
+
+\begin{proof}[Proof of Theorem \ref{thm:normality_ADTT} (Asymptotic Normality)]
+% 仮定とLemmaの参照を修正
+From Lemma \ref{lem:psi_ADTT} and Assumption \ref{as:CLT}, the conditions for Theorem 3.2 (CLT) in \citet{Kojevnikov2021} are satisfied, which establishes asymptotic normality.
+\end{proof}
+
+\begin{proof}[Proof of Theorem \ref{thm:HAC} (HAC Consistency)]
+Since Lemmas \ref{lem:psi_ADTT} show that $\phi_i$ is $\psi$-dependent, the consistency is established by applying Proposition 4.1 of \citet{Kojevnikov2021} under Assumption \ref{as:HAC}.
+\end{proof}
+
+\subsection{Proofs of DR Estimator Theorems}
+
+\begin{proof}[Proof of Theorem \ref{thm:DR_robustness} (Double Robustness)]
+We prove the double robustness property for the ADTT estimator. The proof for AITT follows similar logic.
+
+The DR estimator for ADTT can be written as:
+\begin{align*}
+\widehat{\tau}_{\mathrm{dir}}^{DR} &= \frac{1}{n} \sum_{i=1}^n \Bigg\{ \frac{D_i}{\widehat{\pi}_i(z_i)}\left(\Delta Y_i-\Delta m_{1i}(\bD_{N_i}, z_i)\right) \\
+&\quad -\frac{(1-D_i)\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)(1-\widehat{e}_i(\bD_{N_i}, z_i))}\left(\Delta Y_i-\Delta m_{0i}(\bD_{N_i}, z_i)\right) + \frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)}\left(\Delta m_{1i}(\bD_{N_i}, z_i)-\Delta m_{0i}(\bD_{N_i}, z_i) \right)\Bigg\}.
+\end{align*}
+
+\textbf{Case 1: Propensity score models are correctly specified.}
+When $e_i = \widehat{e}_i$ and $\pi_i = \widehat{\pi}_i$ are correctly specified, we can show that the regression terms cancel out. Specifically, by the law of iterated expectations and the fact that $E[D_i | \bD_{N_i}, z_i] = e_i(\bD_{N_i}, z_i)$, we have:
+\begin{align*}
+E\left[ \frac{D_i}{\widehat{\pi}_i(z_i)} \Delta m_{1i}(\bD_{N_i}, z_i) \right] &= E\left[ \frac{1}{\pi_i(z_i)} E[D_i \Delta m_{1i}(\bD_{N_i}, z_i) | \bD_{N_i}, z_i] \right] \\
+&= E\left[ \frac{e_i(\bD_{N_i}, z_i)}{\pi_i(z_i)} \Delta m_{1i}(\bD_{N_i}, z_i) \right] \\
+&= E\left[ \frac{D_i}{\pi_i(z_i)} (Y_{2i} - Y_{1i}) \right],
+\end{align*}
+and similarly for the $\Delta m_{0i}$ term. The third term $\frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)}\left(\Delta m_{1i}-\Delta m_{0i}\right)$ has expectation:
+\begin{align*}
+E\left[ \frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)}\left(\Delta m_{1i}(\bD_{N_i}, z_i)-\Delta m_{0i}(\bD_{N_i}, z_i)\right) \right] &= E\left[ \frac{e_i(\bD_{N_i}, z_i)}{\pi_i(z_i)} \left(\Delta m_{1i}(\bD_{N_i}, z_i)-\Delta m_{0i}(\bD_{N_i}, z_i)\right) \right],
+\end{align*}
+which, when combined with the first two terms, results in cancellation of the model prediction terms. The DR estimator then reduces to the IPW estimator, which is consistent under Assumptions \ref{as:NoAnticipation} and \ref{as:trend} by Theorem \ref{thm:identification_ADTT}.
+
+\textbf{Case 2: Outcome regression models are correctly specified.}
+When $\mu_{1i} = \Delta m_{1i}$ and $\mu_{0i} = \Delta m_{0i}$ are correctly specified, we can show that the IPW residual terms have zero expectation. Specifically, by the law of iterated expectations:
+\begin{align*}
+E\left[ \frac{D_i}{\pi_i(z_i)}\left(\Delta Y_i-\Delta m_{1i}(\bD_{N_i}, z_i)\right) \middle| \bD_{N_i}, z_i \right] &= \frac{e_i(\bD_{N_i}, z_i)}{\pi_i(z_i)} \left(E[\Delta Y_i | D_i=1, \bD_{N_i}, z_i] - \mu_{1i}(\bD_{N_i}, z_i)\right) = 0,
+\end{align*}
+and similarly for the second term. The third term $\frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)}\left(\Delta m_{1i}-\Delta m_{0i}\right)$ has expectation:
+\begin{align*}
+E\left[ \frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)}\left(\Delta m_{1i}(\bD_{N_i}, z_i)-\Delta m_{0i}(\bD_{N_i}, z_i)\right) \right] &= E\left[ \frac{\widehat{e}_i(\bD_{N_i}, z_i)}{\widehat{\pi}_i(z_i)} \left(\mu_{1i}(\bD_{N_i}, z_i)-\mu_{0i}(\bD_{N_i}, z_i)\right) \right].
+\end{align*}
+When the outcome regression models are correctly specified, this expectation equals ADTT, as the expectation is taken over the distribution of $\bD_{N_i}$ conditional on $D_i=1$ (captured by the weight $\widehat{e}_i(\bD_{N_i}, z_i)/\widehat{\pi}_i(z_i)$). The DR estimator then reduces to this regression-based estimator, which is consistent under Assumptions \ref{as:NoAnticipation} and \ref{as:trend}.
+
+This establishes the double robustness property: the DR estimator is consistent if either the propensity score models or the outcome regression models are correctly specified.
+\end{proof}
+
+\begin{proof}[Proof of Theorem \ref{thm:DR_normality} (Asymptotic Normality of DR)]
+When both the propensity score models and outcome regression models are correctly specified, the DR estimator can be shown to be asymptotically normal using similar arguments to Theorem \ref{thm:normality_ADTT}. The key is to establish that the DR influence function $\phi_i^{DR}$ defined in equation (\ref{eq:Z_DR}) satisfies the $\psi$-dependence property (similar to Lemma \ref{lem:psi_ADTT}) and the weak dependence conditions (Assumptions \ref{as:CLT}). 
+
+Since $\phi_i^{DR}$ is a function of the same fundamental variables $(Y_{1i}, D_i, \epsilon_i)$ and their neighborhoods, and the outcome regression functions $\mu_{1i}$, $\mu_{0i}$, etc. are bounded under Assumption \ref{as:bounded_outcomes}, the $\psi$-dependence structure follows from the same arguments as in Lemma \ref{lem:psi_ADTT}. The asymptotic normality then follows from Theorem 3.2 in \citet{Kojevnikov2021} under Assumption \ref{as:CLT}.
+\end{proof}
+
+\end{document}

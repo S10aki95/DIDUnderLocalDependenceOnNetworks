@@ -7,7 +7,7 @@ This combines IPW with outcome regression models for double robustness.
 
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import List, Optional
 from ...settings import Config
 from ...utils import (
     prepare_data_for_estimation,
@@ -25,6 +25,7 @@ def compute_dr_aitt_influence_function(
     config: Config,
     covariates: List[str] = ["z"],
     treatment_col: str = "D",
+    random_seed: Optional[int] = None,
 ) -> np.ndarray:
     """Calculate influence function for proposed DR AITT estimation method
 
@@ -58,6 +59,7 @@ def compute_dr_aitt_influence_function(
         config: Configuration object
         covariates: List of covariate column names
         treatment_col: Treatment variable column name
+        random_seed: Optional random seed for reproducible neighbor sampling
 
     Returns:
         Array of DR influence functions
@@ -67,16 +69,26 @@ def compute_dr_aitt_influence_function(
     N = len(df)
 
     # Read value from config
-    max_neighbors_per_unit = config.max_neighbors_per_unit
+    max_neighbors = config.max_neighbors
+
+    # Create random number generator for neighbor sampling
+    rng = np.random.default_rng(random_seed) if random_seed is not None else None
 
     # Create pair data (i, j) for AITT estimation
-    # Following paper description, take top L neighbors from distance-sorted neighbors
-    # neighbors_list is already sorted by distance in find_neighbors function
+    # When number of neighbors exceeds L, randomly sample L neighbors to avoid arbitrary selection
     pairs = []
     for i, neighbors in enumerate(neighbors_list):
-        if len(neighbors) > max_neighbors_per_unit:
-            # Already sorted by distance, so take top max_neighbors_per_unit
-            selected_neighbors = neighbors[:max_neighbors_per_unit]
+        if len(neighbors) > max_neighbors:
+            # Randomly sample max_neighbors neighbors
+            if rng is not None:
+                neighbors_array = np.array(neighbors)
+                selected_indices = rng.choice(
+                    len(neighbors_array), size=max_neighbors, replace=False
+                )
+                selected_neighbors = neighbors_array[selected_indices].tolist()
+            else:
+                # Fallback to first L if no rng (backward compatibility)
+                selected_neighbors = neighbors[:max_neighbors]
             pairs.extend([(i, j) for j in selected_neighbors])
         else:
             pairs.extend([(i, j) for j in neighbors])
@@ -94,6 +106,7 @@ def compute_dr_aitt_influence_function(
         pairs=pairs,
         covariates=covariates,
         treatment_col=treatment_col,
+        rng=rng,
     )
     y_pairs = D[[i for i, j in pairs]]
 

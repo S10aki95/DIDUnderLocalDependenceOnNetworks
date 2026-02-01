@@ -6,7 +6,7 @@ Common wrapper for proposed methods (ADTT/AITT) that computes estimates with HAC
 
 import numpy as np
 import pandas as pd
-from typing import Callable, Literal
+from typing import Callable, Literal, Optional
 from ...settings import Config
 from ..common.hac import estimate_hac_se
 from ..common.models import ATTEstimateResult
@@ -20,6 +20,7 @@ def estimate_proposed_with_se(
     influence_calculator: Callable,
     model_type: Literal["logistic"],
     config: Config,
+    random_seed: Optional[int] = None,
 ) -> ATTEstimateResult:
     """Common wrapper for proposed methods (ADTT/AITT) estimation process
 
@@ -33,11 +34,14 @@ def estimate_proposed_with_se(
         influence_calculator: Influence function calculation function
         model_type: Model type
         config: Configuration object
+        random_seed: Optional random seed for reproducible neighbor sampling
 
     Returns:
         ATT estimate and HAC standard error
     """
-    influence_func = influence_calculator(df, neighbors_list, model_type, config)
+    influence_func = influence_calculator(
+        df, neighbors_list, model_type, config, random_seed=random_seed
+    )
 
     estimate = np.mean(influence_func)
     # Calculate HAC standard error
