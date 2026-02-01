@@ -54,6 +54,7 @@ def collect_influence_functions(
         config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs["Proposed IPW (ADTT)"] = adtt_influence
 
@@ -67,6 +68,7 @@ def collect_influence_functions(
         config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs["Proposed IPW (AITT)"] = aitt_influence
 
@@ -80,6 +82,7 @@ def collect_influence_functions(
         config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs["Proposed DR (ADTT)"] = dr_adtt_influence
 
@@ -93,6 +96,7 @@ def collect_influence_functions(
         config,
         covariates=covariates,
         treatment_col=treatment_col,
+        random_seed=random_seed,
     )
     influence_funcs["Proposed DR (AITT)"] = dr_aitt_influence
 

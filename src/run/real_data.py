@@ -777,16 +777,15 @@ class SEZEstimator:
     def _generate_county_neighbors(
         self,
         df: pd.DataFrame,
+        covariate_cols: List[str],
         county_id_col: str = "cty",
         max_neighbors: Optional[int] = None,
-        random_seed: Optional[int] = None,
     ) -> List[List[int]]:
         """Generate neighbor list at county level (internal method)
 
         Based on "county-level neighborhood definition" described in Section 5.9 of the paper,
-        defines other villages in the same county as neighbors.
-        When the number of neighbors exceeds max_neighbors, randomly samples max_neighbors
-        to avoid arbitrary selection based on data ordering.
+        defines other villages in the same county as neighbors. Neighbors are selected and ordered
+        by covariate similarity (Euclidean distance in standardized covariate space).
 
         Uses `groupby().groups` for efficiency.
 
@@ -794,21 +793,35 @@ class SEZEstimator:
             df: Dataframe (index should be sequential from 0)
             county_id_col: Column name indicating county ID (default: "cty")
             max_neighbors: Maximum number of neighbors to use per unit (default: None, uses config.max_neighbors)
-            random_seed: Optional random seed for reproducible neighbor sampling
+            covariate_cols: List of column names to use for covariate-based neighbor selection.
+                           Neighbors are sorted by covariate distance (ascending) and
+                           the first max_neighbors are selected.
 
         Returns:
-            List[List[int]]: List of neighbor indices for each unit
+            List[List[int]]: List of neighbor indices for each unit, sorted by covariate distance
             Format expected by functions in `estimators.py`: List[List[int]]
         """
         if county_id_col not in df.columns:
             raise ValueError(f"County ID column '{county_id_col}' not found.")
 
+        # Check if all covariate columns exist in df
+        missing_cols = [col for col in covariate_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Some covariate columns not found in dataframe: {missing_cols}."
+            )
+
         # Use config.max_neighbors if max_neighbors is not provided
         if max_neighbors is None:
             max_neighbors = self.config.max_neighbors
 
-        # Create random number generator for neighbor sampling
-        rng = np.random.default_rng(random_seed) if random_seed is not None else None
+        # Standardize covariates for distance calculation
+        Z = df[covariate_cols].values
+        Z_mean = Z.mean(axis=0)
+        Z_std = Z.std(axis=0)
+        # Avoid division by zero: if std is 0, set to 1 (column is constant)
+        Z_std = np.where(Z_std < 1e-10, 1.0, Z_std)
+        Z_standardized = (Z - Z_mean) / Z_std
 
         # Create dictionary of indices by county ID for efficiency
         # df.groupby().groups maps group name (county ID) to list of indices
@@ -828,17 +841,27 @@ class SEZEstimator:
             # Exclude self (i)
             neighbor_indices = [idx for idx in indices_in_county if idx != i]
 
-            # Randomly sample max_neighbors if len > max_neighbors
-            if len(neighbor_indices) > max_neighbors:
-                if rng is not None:
-                    # Randomly sample max_neighbors indices
-                    selected_indices = rng.choice(
-                        len(neighbor_indices), size=max_neighbors, replace=False
+            # Sort neighbors by covariate distance (ascending: closest first)
+            if len(neighbor_indices) > 0:
+                # Compute distances from unit i to all candidate neighbors
+                z_i = Z_standardized[i]
+                distances = []
+                for j in neighbor_indices:
+                    z_j = Z_standardized[j]
+                    dist = np.linalg.norm(z_i - z_j)
+                    distances.append(dist)
+
+                # Sort neighbor_indices by distance (ascending)
+                # Use lexsort to break ties deterministically by index when distances are equal
+                neighbor_indices = [
+                    neighbor_indices[k]
+                    for k in np.lexsort(
+                        (np.array(neighbor_indices), np.array(distances))
                     )
-                    neighbor_indices = [neighbor_indices[j] for j in selected_indices]
-                else:
-                    # Fallback to first max_neighbors if no rng (backward compatibility)
-                    neighbor_indices = neighbor_indices[:max_neighbors]
+                ]
+
+            # Take first max_neighbors (most similar)
+            neighbor_indices = neighbor_indices[:max_neighbors]
 
             neighbors_list.append(neighbor_indices)
 
@@ -848,57 +871,95 @@ class SEZEstimator:
         self,
         influence_func: np.ndarray,
         county_ids: np.ndarray,
+        df: pd.DataFrame,
+        covariate_cols: List[str],
     ) -> float:
-        """Calculate HAC standard error considering only within-county correlation (memory-efficient optimized version)
+        """Calculate HAC standard error using covariate-based distance matrix
 
-        Ignores between-county correlation, considers only spatial correlation within each county.
-        For memory efficiency, does not create full distance matrix, groups by county and
-        calls estimate_hac_se, then combines variances.
+        Uses covariate similarity to construct distance matrix. Distances between units
+        in the same county are computed as Euclidean distance in standardized covariate space.
+        Distances between units in different counties are set to a very large value so that
+        kernel weights become zero (effectively ignoring between-county correlation).
 
         Args:
             influence_func: Array of influence functions
             county_ids: Array of county IDs (same length as influence_func)
+            df: Dataframe containing covariate columns
+            covariate_cols: List of column names to use for covariate-based distance calculation
 
         Returns:
             HAC standard error
         """
         N = len(influence_func)
-        distance_within_group = 1.0
 
-        # Calculate bandwidth
-        b = self.config.hac_bandwidth_multiplier * distance_within_group
+        # Check if all covariate columns exist in df
+        missing_cols = [col for col in covariate_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Some covariate columns not found in dataframe: {missing_cols}."
+            )
 
-        # Center by overall mean (for use in each group)
-        Z_mean = np.mean(influence_func)
-        Z_centered = influence_func - Z_mean
+        # Standardize covariates for distance calculation (once for all data)
+        Z = df[covariate_cols].values
+        Z_mean = Z.mean(axis=0)
+        Z_std = Z.std(axis=0)
+        # Avoid division by zero: if std is 0, set to 1 (column is constant)
+        Z_std = np.where(Z_std < 1e-10, 1.0, Z_std)
+        Z_standardized = (Z - Z_mean) / Z_std
 
-        # Group by county and calculate HAC variance (memory efficient)
-        # V_hac = (1/N) * Σ_g Σ_i∈g Σ_j∈g Z_i * Z_j * w_ij
-        # Since w_ij = 0 between counties, only need to calculate within each county
-        V_hac_total = 0.0
-
-        # Group by county ID
+        # Calculate bandwidth: collect within-county distances (without creating full matrix)
+        within_county_distances = []
         unique_counties = np.unique(county_ids)
 
         for county_id in unique_counties:
-            # Indices of observations belonging to this county
+            county_mask = county_ids == county_id
+            Z_county = Z_standardized[county_mask]
+            n_county = len(Z_county)
+
+            if n_county > 1:
+                # Compute distances within county only (memory efficient)
+                for i in range(n_county):
+                    for j in range(i + 1, n_county):
+                        dist = np.linalg.norm(Z_county[i] - Z_county[j])
+                        within_county_distances.append(dist)
+
+        # Calculate bandwidth based on median of within-county covariate distances
+        if len(within_county_distances) > 0:
+            median_dist = np.median(within_county_distances)
+            b = self.config.hac_bandwidth_multiplier * median_dist
+        else:
+            # Fallback if no within-county distances (should not happen in practice)
+            b = (
+                self.config.hac_bandwidth_multiplier
+                * self.config.hac_default_max_distance
+            )
+
+        # Calculate HAC variance: loop by county (memory-efficient, preserves original structure)
+        Z_mean_influence = np.mean(influence_func)
+        Z_centered = influence_func - Z_mean_influence
+        V_hac_total = 0.0
+
+        for county_id in unique_counties:
             county_mask = county_ids == county_id
             Z_county = Z_centered[county_mask]
             n_county = len(Z_county)
 
             if n_county > 0:
-                # Create distance matrix within group (small, so memory efficient)
-                # Distance within county is all distance_within_group
-                dist_matrix_county = np.full(
-                    (n_county, n_county), distance_within_group
-                )
-                np.fill_diagonal(dist_matrix_county, 0.0)  # Diagonal elements are 0
+                # Create covariate distance matrix within county (small, memory efficient)
+                Z_county_std = Z_standardized[county_mask]
+                dist_matrix_county = np.zeros((n_county, n_county))
 
-                # Call estimate_hac_se for this county
-                # Pass Z_county + Z_mean (estimate_hac_se centers again internally,
+                for i in range(n_county):
+                    for j in range(i + 1, n_county):
+                        dist = np.linalg.norm(Z_county_std[i] - Z_county_std[j])
+                        dist_matrix_county[i, j] = dist
+                        dist_matrix_county[j, i] = dist
+
+                # Calculate HAC standard error for this county
+                # Pass Z_county + Z_mean_influence (estimate_hac_se centers again internally,
                 # so need values centered by overall mean)
                 SE_g = estimate_hac_se(
-                    influence_func=Z_county + Z_mean,
+                    influence_func=Z_county + Z_mean_influence,
                     dist_matrix=dist_matrix_county,
                     bandwidth=b,
                     config=self.config,
@@ -965,13 +1026,15 @@ class SEZEstimator:
             progress_bar.update(1)
 
         # Create neighbor list at county level (real data-specific processing)
+        # Use covariate-based neighbor selection: neighbors are sorted by covariate similarity
+        # so that D_{(k)} denotes the treatment of the k-th most covariate-similar village
         if progress_bar:
             progress_bar.set_description("Proposed methods: Creating neighbor list")
         neighbors_list = self._generate_county_neighbors(
             df_clean,
+            covariates,  # Use covariate distance to define neighbor order (required parameter)
             county_id_col=county_id_col,
             max_neighbors=self.config.max_neighbors,
-            random_seed=self.config.random_seed,
         )
         if progress_bar:
             progress_bar.update(1)
@@ -994,6 +1057,7 @@ class SEZEstimator:
             self.config,
             covariates=covariates,
             treatment_col="D",
+            random_seed=self.config.random_seed,
         )
         if progress_bar:
             progress_bar.update(1)
@@ -1009,6 +1073,7 @@ class SEZEstimator:
             self.config,
             covariates=covariates,
             treatment_col="D",
+            random_seed=self.config.random_seed,
         )
         if progress_bar:
             progress_bar.update(1)
@@ -1029,6 +1094,8 @@ class SEZEstimator:
         adtt_hac_se = self._estimate_hac_se_within_county(
             adtt_influence,
             county_ids,
+            df_clean,
+            covariates,
         )
         if progress_bar:
             progress_bar.update(1)
@@ -1040,6 +1107,8 @@ class SEZEstimator:
         aitt_hac_se = self._estimate_hac_se_within_county(
             aitt_influence,
             county_ids,
+            df_clean,
+            covariates,
         )
         if progress_bar:
             progress_bar.update(1)
